@@ -54,7 +54,26 @@ spec:
                     type: array
                   disks:
                     items:
-                      type: string
+                      properties:
+                        diskpath:
+                          type: string
+                        disktype:
+                          type: string
+                        isrdm:
+                          type: boolean
+                        label:
+                          type: string
+                        rdmtype:
+                          type: string
+                        sizebytes:
+                          format: int64
+                          type: integer
+                        unitnumber:
+                          format: int32
+                          type: integer
+                        uuid:
+                          type: string
+                      type: object
                     type: array
                   ipAddress:
                     type: string

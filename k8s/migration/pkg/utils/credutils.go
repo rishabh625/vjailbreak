@@ -27,6 +27,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/constants"
 	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session/cache"
 	"github.com/vmware/govmomi/vim25"
@@ -552,8 +553,14 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 	if err != nil {
 		return nil, fmt.Errorf("failed to get vms: %w", err)
 	}
+	ctxlog := log.FromContext(ctx)
 	var vminfo []vjailbreakv1alpha1.VMInfo
 	for _, vm := range vms {
+		diskInfo, err := GetVMDiskInfo(ctx, vm)
+		if err != nil {
+			ctxlog.Error(err, "failed to get disk info for vm", "vm", vm.Name())
+		}
+		ctxlog.Info(fmt.Sprintf("Disk info for VM '%s': %v", vm.Name(), diskInfo))
 		var vmProps mo.VirtualMachine
 		err = vm.Properties(ctx, vm.Reference(), []string{"config", "guest"}, &vmProps)
 		if err != nil {
@@ -561,7 +568,7 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 		}
 		var datastores []string
 		var networks []string
-		var disks []string
+		var disks []*vjailbreakv1alpha1.DiskInfo
 		var ds mo.Datastore
 		var dsref types.ManagedObjectReference
 		if vmProps.Config == nil {
@@ -591,7 +598,7 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 					return nil, fmt.Errorf("failed to get datastore: %w", err)
 				}
 				datastores = AppendUnique(datastores, ds.Name)
-				disks = append(disks, device.GetVirtualDevice().DeviceInfo.GetDescription().Label)
+				disks = append(disks, diskInfo...)
 			}
 		}
 		vminfo = append(vminfo, vjailbreakv1alpha1.VMInfo{
@@ -667,7 +674,7 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("failed to get VMwareMachine: %w", err)
 	}
-
+	ctxlog.Info("Im function CreateOrUpdateVMwareMachine")
 	// Check if the object is present or not if not present create a new object and set init to true.
 	if k8serrors.IsNotFound(err) {
 		// If not found, create a new object
@@ -685,8 +692,21 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 		ctxlog.Info("Creating new VMwareMachine", "Name", vmwvmKey.Name)
 		init = true
 	} else {
+		ctxlog.Info("Inside else")
 		label := fmt.Sprintf("%s-%s", constants.VMwareCredsLabel, vmwcreds.Name)
-
+		if vmwvm.Spec.VMs.Disks == nil {
+			vmwvm.Spec.VMs.Disks = vminfo.Disks
+		} else {
+			// Check if disks already exist with same value
+			for _, disk := range vminfo.Disks {
+				if !slices.Contains(vmwvm.Spec.VMs.Disks, disk) {
+					ctxlog.Info("Adding new disk to VMwareMachine",
+						"Name", vmwvmKey.Name,
+						"Disk", disk)
+					vmwvm.Spec.VMs.Disks = append(vmwvm.Spec.VMs.Disks, disk)
+				}
+			}
+		}
 		// Check if label already exists with same value
 		if vmwvm.Labels == nil || vmwvm.Labels[label] != "true" {
 			ctxlog.Info("Adding new label to VMwareMachine",
@@ -705,6 +725,18 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 			if err = client.Update(ctx, vmwvm); err != nil {
 				return fmt.Errorf("failed to update VMwareMachine labels: %w", err)
 			}
+		}
+		// Update disk details if they do not match
+		if !slices.Equal(vmwvm.Spec.VMs.Disks, vminfo.Disks) {
+			ctxlog.Info("Updating disk details for VMwareMachine",
+				"Name", vmwvmKey.Name,
+				"OldDisks", vmwvm.Spec.VMs.Disks,
+				"NewDisks", vminfo.Disks)
+			vmwvm.Spec.VMs.Disks = vminfo.Disks
+		} else {
+			ctxlog.Info("No changes in disk details for VMwareMachine",
+				"Name", vmwvmKey.Name,
+				"Disks", vminfo.Disks)
 		}
 	}
 
@@ -786,4 +818,56 @@ func GetClosestFlavour(ctx context.Context, cpu, memory int, computeClient *goph
 		"required_vCPUs", cpu,
 		"required_RAM_MB", memory)
 	return nil, fmt.Errorf("no suitable flavor found for %d vCPUs and %d MB RAM", cpu, memory)
+}
+
+func GetVMDiskInfo(ctx context.Context, vm *object.VirtualMachine) ([]*vjailbreakv1alpha1.DiskInfo, error) {
+	var devices object.VirtualDeviceList
+	var props mo.VirtualMachine
+
+	err := vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &props)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VM properties: %v", err)
+	}
+
+	devices = props.Config.Hardware.Device
+	var diskInfos []*vjailbreakv1alpha1.DiskInfo
+
+	for _, device := range devices {
+		// Check if device is a virtual disk
+		if disk, ok := device.(*types.VirtualDisk); ok {
+			info := &vjailbreakv1alpha1.DiskInfo{
+				Label:      devices.Name(device),
+				UnitNumber: *disk.UnitNumber,
+				SizeBytes:  disk.CapacityInBytes,
+			}
+
+			// Check backing type to determine if it's RDM or regular virtual disk
+			switch backing := disk.Backing.(type) {
+			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+				info.IsRDM = true
+				info.DiskPath = backing.DeviceName
+				info.UUID = backing.Uuid // Get UUID for virtual disk
+				info.DiskType = "rdm"
+				if backing.CompatibilityMode == string(types.VirtualDiskCompatibilityModePhysicalMode) {
+					info.RDMType = "physical"
+				} else {
+					info.RDMType = "virtual"
+				}
+
+			case *types.VirtualDiskFlatVer2BackingInfo:
+				info.IsRDM = false
+				info.DiskPath = backing.FileName
+				info.UUID = backing.Uuid // Get UUID for virtual disk
+				info.DiskType = string(backing.DiskMode)
+				info.RDMType = ""
+
+			default:
+				return nil, fmt.Errorf("unsupported disk backing type: %T", backing)
+			}
+
+			diskInfos = append(diskInfos, info)
+		}
+	}
+
+	return diskInfos, nil
 }

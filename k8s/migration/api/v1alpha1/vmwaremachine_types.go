@@ -20,16 +20,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type DiskInfo struct {
+	Label      string `json:"label,omitempty"`
+	DiskPath   string `json:"diskpath,omitempty"`
+	SizeBytes  int64  `json:"sizebytes,omitempty"`
+	DiskType   string `json:"disktype,omitempty"`
+	UnitNumber int32  `json:"unitnumber,omitempty"`
+	IsRDM      bool   `json:"isrdm,omitempty"`
+	RDMType    string `json:"rdmtype,omitempty"` // 'physical' or 'virtual' for RDM disks
+	UUID       string `json:"uuid,omitempty"`
+}
+
 type VMInfo struct {
-	Name       string   `json:"name"`
-	Datastores []string `json:"datastores,omitempty"`
-	Disks      []string `json:"disks,omitempty"`
-	Networks   []string `json:"networks,omitempty"`
-	IPAddress  string   `json:"ipAddress,omitempty"`
-	VMState    string   `json:"vmState,omitempty"`
-	OSType     string   `json:"osType,omitempty"`
-	CPU        int      `json:"cpu,omitempty"`
-	Memory     int      `json:"memory,omitempty"`
+	Name       string      `json:"name"`
+	Datastores []string    `json:"datastores,omitempty"`
+	Disks      []*DiskInfo `json:"disks,omitempty"`
+	Networks   []string    `json:"networks,omitempty"`
+	IPAddress  string      `json:"ipAddress,omitempty"`
+	VMState    string      `json:"vmState,omitempty"`
+	OSType     string      `json:"osType,omitempty"`
+	CPU        int         `json:"cpu,omitempty"`
+	Memory     int         `json:"memory,omitempty"`
 }
 
 // VMwareMachineSpec defines the desired state of VMwareMachine

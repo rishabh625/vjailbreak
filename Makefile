@@ -17,7 +17,7 @@ endif
 
 VERSION = $(RELEASE_VER)-$(GIT_SHA)
 
-export REPO ?= platform9
+export REPO ?= rishabhinfracloud
 export TAG ?= $(VERSION)
 
 export UI_IMG ?= ${REPO}/vjailbreak-ui:${TAG}
