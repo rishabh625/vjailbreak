@@ -7,7 +7,7 @@ require (
 	github.com/gophercloud/gophercloud v1.13.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/pkg/errors v0.9.1
-	github.com/platform9/vjailbreak/k8s/migration v0.0.0-20250317094948-061381bbe342
+	github.com/platform9/vjailbreak/k8s/migration v0.0.0-20250425061212-cc48b9f1dffb
 	github.com/prometheus-community/pro-bing v0.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.39.0
@@ -18,6 +18,8 @@ require (
 	libguestfs.org/libnbd v1.20.0
 	sigs.k8s.io/controller-runtime v0.20.3
 )
+
+replace github.com/platform9/vjailbreak/k8s/migration v0.0.0-20250425061212-cc48b9f1dffb => /home/rishabh-mishra/infracloud/github.com/vjailbreak/k8s/migration
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

@@ -121,6 +121,7 @@ func (r *VMwareCredsReconciler) reconcileNormal(ctx context.Context, scope *scop
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error getting info of all VMs for VMwareCreds '%s'", scope.Name()))
 	}
+	ctxlog.Info(fmt.Sprintf("Successfully got info of all VMs for VMwareCreds '%s' VM : %d", scope.Name(), len(vminfo)))
 	err = utils.CreateOrUpdateVMwareMachines(ctx, scope.Client, scope.VMwareCreds, vminfo)
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error creating VMs for VMwareCreds '%s'", scope.Name()))

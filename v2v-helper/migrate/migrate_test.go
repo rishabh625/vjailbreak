@@ -428,7 +428,6 @@ func TestDetachAllVolumes(t *testing.T) {
 func TestDeleteAllVolumes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	mockOpenStackOps := openstack.NewMockOpenstackOperations(ctrl)
 	mockOpenStackOps.EXPECT().DeleteVolume(gomock.Any()).Return(nil).AnyTimes()
 
