@@ -550,10 +550,7 @@ type CustomFieldHolder struct {
 
 // GetAllVMs gets all the VMs in a datacenter
 func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, datacenter string) ([]vjailbreakv1alpha1.VMInfo, error) {
-	logx := log.FromContext(ctx)
-	logx.Info("Getting all VMs in datacenter", "datacenter", datacenter)
 	c, err := ValidateVMwareCreds(vmwcreds)
-	logx.Info("Validating vCenter credentials")
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate vCenter connection: %w", err)
 	}
@@ -579,7 +576,6 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 		if err != nil {
 			ctxlog.Error(err, "Failed to retrieve custom field definitions")
 		} else {
-			ctxlog.Info("Retrieved custom field definitions", "count", len(customFieldsManager.Field))
 			customFields = customFieldsManager.Field
 			for _, field := range customFields {
 				ctxlog.Info("Custom field definition",
@@ -588,7 +584,6 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 					"type", field.Type,
 					"managedObjectType", field.ManagedObjectType)
 			}
-			ctxlog.Info("Retrieved custom field definitions done", "count", len(customFieldsManager.Field))
 		}
 	} else {
 		ctxlog.Info("No custom fields manager available")
@@ -601,8 +596,6 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			ctxlog.Info("Found custom field", "name", customField.Name, "key", customField.Key)
 		}
 	}
-	ctxlog.Info("Custom field iteration done", "count", len(customFields))
-	ctxlog.Info("Total VMs to iterate", "count", len(vms))
 	for _, vm := range vms {
 		var vmProps mo.VirtualMachine
 		err = vm.Properties(ctx, vm.Reference(), []string{
@@ -633,18 +626,14 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			}
 		}
 		// Get basic RDM disk info from VM properties
-		ctxlog.Info("Getting RDM disk info for VM", "vm", vm.Name())
-		diskInfo, err := GetRDMDiskInfo(ctx, vm)
+		diskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
+		hostStorageInfo, err := GetHostStorageDeviceInfo(ctx, vm)
 		if err != nil {
-			ctxlog.Error(err, "failed to get disk info for vm", "vm", vm.Name())
+			ctxlog.Error(err, "failed to get disk info for vm skipping vm", "vm", vm.Name())
+			continue
 		}
-		ctxlog.Info("done Getting RDM disk info for VM", "vm", vm.Name())
-
 		// Combine annotation and custom attributes
 		attributes := append([]string{vmProps.Summary.Config.Annotation}, customAttributes...)
-
-		// Use the new method to populate RDM disk info
-		rdmDisks := PopulateRDMDiskInfoFromAttributes(diskInfo, attributes)
 
 		pc := property.DefaultCollector(c)
 		var datastores []string
@@ -658,8 +647,7 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			}
 			networks = append(networks, netObj.Name)
 		}
-		ctxlog.Info("VM networks", "networks", networks)
-
+		var rdmDisks []vjailbreakv1alpha1.RDMDiskInfo
 		for _, device := range vmProps.Config.Hardware.Device {
 			disk, ok := device.(*types.VirtualDisk)
 			if !ok {
@@ -674,10 +662,27 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 				dsref = backing.Datastore.Reference()
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				dsref = backing.Datastore.Reference()
+
+				if hostStorageInfo != nil {
+					info := vjailbreakv1alpha1.RDMDiskInfo{
+						DiskName: disk.DeviceInfo.GetDescription().Label,
+						DiskSize: disk.CapacityInBytes,
+					}
+					for _, scsiDisk := range hostStorageInfo.ScsiLun {
+
+						lunDetails := scsiDisk.GetScsiLun()
+						if backing.Uuid == lunDetails.Uuid {
+							info.DisplayName = lunDetails.DisplayName
+							info.UUID = lunDetails.Uuid
+						}
+					}
+					diskInfos = append(diskInfos, info)
+				}
 			default:
 				return nil, fmt.Errorf("unsupported disk backing type: %T", disk.Backing)
 			}
-
+			// Use the new method to populate RDM disk info
+			rdmDisks = PopulateRDMDiskInfoFromAttributes(diskInfos, attributes)
 			var ds mo.Datastore
 			err := pc.RetrieveOne(ctx, dsref, []string{"name"}, &ds)
 			if err != nil {
@@ -687,26 +692,20 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			datastores = AppendUnique(datastores, ds.Name)
 			disks = append(disks, disk.DeviceInfo.GetDescription().Label)
 		}
-		ctxlog.Info("VM info appending ", "disks", disks)
-		ctxlog.Info("VM info appending ", "name", vmProps.Config.Name)
-		ctxlog.Info("VM info appending ", "rdm", rdmDisks)
 
 		vminfo = append(vminfo, vjailbreakv1alpha1.VMInfo{
-			Name:             vmProps.Config.Name,
-			Datastores:       datastores,
-			Disks:            disks,
-			RDMDisks:         rdmDisks,
-			Networks:         networks,
-			IPAddress:        vmProps.Guest.IpAddress,
-			VMState:          vmProps.Guest.GuestState,
-			OSType:           vmProps.Guest.GuestFamily,
-			CPU:              int(vmProps.Config.Hardware.NumCPU),
-			Memory:           int(vmProps.Config.Hardware.MemoryMB),
-			Annotation:       vmProps.Summary.Config.Annotation,
-			CustomAttributes: customAttributes,
+			Name:       vmProps.Config.Name,
+			Datastores: datastores,
+			Disks:      disks,
+			RDMDisks:   rdmDisks,
+			Networks:   networks,
+			IPAddress:  vmProps.Guest.IpAddress,
+			VMState:    vmProps.Guest.GuestState,
+			OSType:     vmProps.Guest.GuestFamily,
+			CPU:        int(vmProps.Config.Hardware.NumCPU),
+			Memory:     int(vmProps.Config.Hardware.MemoryMB),
 		})
 	}
-	ctxlog.Info("Returning VM info", "count", len(vminfo))
 	return vminfo, nil
 }
 
@@ -722,10 +721,8 @@ func AppendUnique(slice []string, values ...string) []string {
 
 func CreateOrUpdateVMwareMachines(ctx context.Context, client client.Client,
 	vmwcreds *vjailbreakv1alpha1.VMwareCreds, vminfo []vjailbreakv1alpha1.VMInfo) error {
-	fmt.Println("Creating or updating VM: funx is called")
 	var wg sync.WaitGroup
 	for i := range vminfo {
-		fmt.Println("Creating or updating VM:", vminfo[i].Name)
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -736,7 +733,6 @@ func CreateOrUpdateVMwareMachines(ctx context.Context, client client.Client,
 				}
 			}()
 			vm := &vminfo[i] // Use a pointer
-			fmt.Println("Creating or updating VM: Called VMwareMachine", vminfo[i].Name)
 			err := CreateOrUpdateVMwareMachine(ctx, client, vmwcreds, vm)
 			if err != nil {
 				fmt.Printf("Error creating or updating VM '%s': %v\n", vm.Name, err)
@@ -772,7 +768,6 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 
 	// Check if the object is present or not if not present create a new object and set init to true.
 	if k8serrors.IsNotFound(err) {
-		fmt.Println("VM info : ", *vminfo, "Name : ", vmwvmKey.Name)
 		// If not found, create a new object
 		label := fmt.Sprintf("%s-%s", constants.VMwareCredsLabel, vmwcreds.Name)
 		vmwvm = &vjailbreakv1alpha1.VMwareMachine{
@@ -883,50 +878,42 @@ func GetClosestFlavour(ctx context.Context, cpu, memory int, computeClient *goph
 	return nil, fmt.Errorf("no suitable flavor found for %d vCPUs and %d MB RAM", cpu, memory)
 }
 
-func GetRDMDiskInfo(ctx context.Context, vm *object.VirtualMachine) ([]vjailbreakv1alpha1.RDMDiskInfo, error) {
-	var devices object.VirtualDeviceList
-	var props mo.VirtualMachine
-	err := vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &props)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get VM properties: %v", err)
-	}
-
-	devices = props.Config.Hardware.Device
-	hostStorageInfo, err := GetHostStorageDeviceInfo(ctx, vm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get VM storage properties: %v", err)
-	}
-	fmt.Println("Host storage info:", hostStorageInfo)
-	diskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
-	for _, device := range devices {
-		// Check if device is a virtual disk
-		if disk, ok := device.(*types.VirtualDisk); ok {
-			info := vjailbreakv1alpha1.RDMDiskInfo{
-				DiskName: devices.Name(device),
-				DiskSize: disk.CapacityInBytes,
-			}
-			// Check backing type to determine if it's RDM or regular virtual disk
-			switch backing := disk.Backing.(type) {
-			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
-				fmt.Println("Backing type is RDM")
-				if hostStorageInfo != nil {
-					for _, scsiDisk := range hostStorageInfo.ScsiLun {
-						lunDetails := scsiDisk.GetScsiLun()
-						if backing.Uuid == lunDetails.Uuid {
-							info.DisplayName = lunDetails.DisplayName
-							info.UUID = lunDetails.Uuid
-							info.OperationalState = lunDetails.OperationalState
-						}
-					}
-				}
-			}
-
-			diskInfos = append(diskInfos, info)
+/*
+	func GetRDMDiskInfo(ctx context.Context, vm *object.VirtualMachine) ([]vjailbreakv1alpha1.RDMDiskInfo, error) {
+		var devices object.VirtualDeviceList
+		var props mo.VirtualMachine
+		err := vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &props)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get VM properties: %v", err)
 		}
-	}
-	return diskInfos, nil
-}
 
+		devices = props.Config.Hardware.Device
+		hostStorageInfo, err := GetHostStorageDeviceInfo(ctx, vm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get VM storage properties: %v", err)
+		}
+		fmt.Println("Host storage info:", hostStorageInfo)
+		diskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
+		for _, device := range devices {
+			// Check if device is a virtual disk
+			if disk, ok := device.(*types.VirtualDisk); ok {
+				info := vjailbreakv1alpha1.RDMDiskInfo{
+					DiskName: devices.Name(device),
+					DiskSize: disk.CapacityInBytes,
+				}
+				// Check backing type to determine if it's RDM or regular virtual disk
+				switch backing := disk.Backing.(type) {
+				case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+					fmt.Println("Backing type is RDM")
+
+				}
+
+				diskInfos = append(diskInfos, info)
+			}
+		}
+		return diskInfos, nil
+	}
+*/
 func GetHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine) (*types.HostStorageDeviceInfo, error) {
 	// Get the host system that the VM is running on
 	hostSystem, err := vm.HostSystem(ctx)
@@ -979,32 +966,16 @@ func GetHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine) (*
 	return storageDeviceInfo, nil
 }*/
 
-// GetVMwareMachine retrieves the VMwareMachine CR for a given VM name
-func GetVMwareMachine(ctx context.Context, c client.Client, vmName string, namespace string) (*vjailbreakv1alpha1.VMwareMachine, error) {
-	vmMachine := &vjailbreakv1alpha1.VMwareMachine{}
-
-	// Convert VM name to k8s compatible name
-	sanitizedVMName, err := ConvertToK8sName(vmName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert VM name: %w", err)
-	}
-
-	// Create namespaced name for lookup
-	namespacedName := k8stypes.NamespacedName{
-		Name:      sanitizedVMName,
-		Namespace: namespace,
-	}
-
-	// Get the VMwareMachine resource
-	if err := c.Get(ctx, namespacedName, vmMachine); err != nil {
-		return nil, fmt.Errorf("failed to get VMwareMachine %s/%s: %w", namespace, sanitizedVMName, err)
-	}
-
-	return vmMachine, nil
-}
-
 // RDM disk attributes in Vmware for migration - diskName: cinderBackendPool:value
-// volumeType:availabilityZone:bootable:description
+// eg:
+// VJB_RDM: |
+//
+//	Hard Disk 1:volumeType:abc
+//	Hard Disk 1:cinderBackendPool:hv01@hpe#ssd_r6
+//  Hard Disk:
+//   volumeRef:
+//			"source-id": "abac111"
+
 // PopulateRDMDiskInfoFromAttributes processes VM annotations and custom attributes to populate RDM disk information
 func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDiskInfo, attributes []string) []vjailbreakv1alpha1.RDMDiskInfo {
 	rdmMap := make(map[string]*vjailbreakv1alpha1.RDMDiskInfo)
@@ -1040,23 +1011,15 @@ func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDisk
 		switch key {
 		case "cinderBackendPool":
 			if value != "" {
-				rdmInfo.CinderBackendPool = value
+				rdmInfo.OpenstackVolumeRef.CinderBackendPool = value
 			}
 		case "volumeType":
 			if value != "" {
-				rdmInfo.VolumeType = value
+				rdmInfo.OpenstackVolumeRef.VolumeType = value
 			}
-		case "availabilityZone":
+		case "volumeRef":
 			if value != "" {
-				rdmInfo.AvailabilityZone = value
-			}
-		case "bootable":
-			if value != "" {
-				rdmInfo.Bootable = strings.ToLower(value) == "true"
-			}
-		case "description":
-			if value != "" {
-				rdmInfo.Description = value
+				rdmInfo.OpenstackVolumeRef.VolumeRef = value
 			}
 		}
 	}
@@ -1064,7 +1027,6 @@ func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDisk
 	// Convert map back to slice while preserving all data
 	rdmDisks := make([]vjailbreakv1alpha1.RDMDiskInfo, 0, len(rdmMap))
 	for _, rdmInfo := range rdmMap {
-		fmt.Println("RDM Info:", rdmInfo.DiskName, rdmInfo.CinderBackendPool)
 		rdmDisks = append(rdmDisks, *rdmInfo)
 	}
 

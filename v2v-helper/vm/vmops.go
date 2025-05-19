@@ -27,7 +27,7 @@ import (
 type VMOperations interface {
 	GetVMInfo(ostype string) (VMInfo, error)
 	GetVMObj() *object.VirtualMachine
-	UpdateDiskInfo(vminfo VMInfo, namespace string) (VMInfo, error)
+	UpdateDiskInfo(vminfo VMInfo) (VMInfo, error)
 	IsCBTEnabled() (bool, error)
 	EnableCBT() error
 	TakeSnapshot(name string) error
@@ -80,20 +80,18 @@ type RDMDisk struct {
 	UUID string `json:"uuid,omitempty"`
 	// DisplayName is the display name of the disk
 	DisplayName string `json:"displayName,omitempty"`
-	// OperationalState is the operational state of the disk
-	OperationalState []string `json:"operationalState,omitempty"`
 	// CinderBackendPool is the cinder backend pool of the disk
 	CinderBackendPool string `json:"cinderBackendPool,omitempty"`
 	// VolumeType is the volume type of the disk
 	VolumeType string `json:"volumeType,omitempty"`
-	// AvailabilityZone is the availability zone of the disk
-	AvailabilityZone string `json:"availabilityZone,omitempty"`
 	// Bootable indicates if the disk is bootable
 	Bootable bool `json:"bootable,omitempty"`
-	// DiskMode is the mode of the disk
-	Description string `json:"description,omitempty"`
-
+	// Bootable indicates if the disk is bootable
+	Path string `json:"path,omitempty"`
+	// VolumeId is the ID of the volume
 	VolumeId string `json:"volumeId,omitempty"`
+	// OpenstackVolumeRef contains OpenStack volume reference information
+	VolumeRef string `json:"volumeRef,omitempty"`
 }
 
 type VMOps struct {
@@ -230,7 +228,7 @@ func getChangeID(disk *types.VirtualDisk) (*ChangeID, error) {
 	return parseChangeID(changeId)
 }
 
-func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo, namespace string) (VMInfo, error) {
+func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
 	pc := vmops.vcclient.VCPropertyCollector
 	vm := vmops.VMObj
 	var snapbackingdisk []string
@@ -271,7 +269,7 @@ func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo, namespace string) (VMInfo, err
 			vminfo.VMDisks[idx].ChangeID = snapid[idx]
 		}
 		// Based on VMName and diskname fetch DiskInfo
-		rdmDIskInfo, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name, namespace)
+		rdmDIskInfo, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name)
 		if err != nil {
 			return vminfo, fmt.Errorf("failed to get rdmDisk properties: %s", err)
 		}
@@ -417,7 +415,7 @@ func (vmops *VMOps) VMPowerOn() error {
 	return nil
 }
 
-func GetVMwareMachine(ctx context.Context, client client.Client, vmName string, namespace string) (*vjailbreakv1alpha1.VMwareMachine, error) {
+func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) (*vjailbreakv1alpha1.VMwareMachine, error) {
 	// Convert VM name to k8s compatible name
 	sanitizedVMName := ConvertToK8sName(vmName)
 
@@ -426,8 +424,7 @@ func GetVMwareMachine(ctx context.Context, client client.Client, vmName string, 
 
 	// Create namespaced name for lookup
 	namespacedName := k8stypes.NamespacedName{
-		Name:      sanitizedVMName,
-		Namespace: namespace,
+		Name: sanitizedVMName,
 	}
 
 	// Get VMwareMachine object
@@ -463,12 +460,9 @@ func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine)
 				DiskSize:          disk.DiskSize,
 				UUID:              disk.UUID,
 				DisplayName:       disk.DisplayName,
-				OperationalState:  disk.OperationalState,
-				CinderBackendPool: disk.CinderBackendPool,
-				VolumeType:        disk.VolumeType,
-				AvailabilityZone:  disk.AvailabilityZone,
-				Bootable:          disk.Bootable,
-				Description:       disk.Description,
+				CinderBackendPool: disk.OpenstackVolumeRef.CinderBackendPool,
+				VolumeType:        disk.OpenstackVolumeRef.VolumeType,
+				VolumeRef:         disk.OpenstackVolumeRef.VolumeRef,
 			}
 		}
 	}

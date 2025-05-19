@@ -249,7 +249,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		return vminfo, fmt.Errorf("failed to take snapshot of source VM: %s", err)
 	}
 	// TODO: Add namespace
-	vminfo, err = vmops.UpdateDiskInfo(vminfo, "")
+	vminfo, err = vmops.UpdateDiskInfo(vminfo)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to update disk info: %s", err)
 	}
@@ -352,7 +352,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		// Only do this after you have gone through all disks with old change id.
 		// If you dont, only your first disk will have the updated changes
 		// TODO: add namespace
-		vminfo, err = vmops.UpdateDiskInfo(vminfo, "")
+		vminfo, err = vmops.UpdateDiskInfo(vminfo)
 		if err != nil {
 			return vminfo, fmt.Errorf("failed to update disk info: %s", err)
 		}
@@ -418,7 +418,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	}
 
 	for idx, rdmdisk := range vminfo.RDMDisks {
-		vminfo.VMDisks[idx].Path, err = migobj.AttachVolume(rdmdisk.VolumeId)
+		vminfo.RDMDisks[idx].Path, err = migobj.AttachVolume(rdmdisk.VolumeId)
 		if err != nil {
 			return fmt.Errorf("failed to attach volume for RDM: %s", err)
 		}
@@ -447,6 +447,22 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		osPath = strings.TrimSpace(ans)
 		bootVolumeIndex = idx
 		useSingleDisk = true
+		break
+	}
+
+	for idx, rdmdisk := range vminfo.RDMDisks {
+		// check if individual disks are bootable
+		ans, err := virtv2v.RunCommandInGuest(rdmdisk.Path, getBootCommand, false)
+		if err != nil {
+			log.Printf("Error running '%s'. Error: '%s', Output: %s\n", getBootCommand, err, strings.TrimSpace(ans))
+			continue
+		}
+
+		if ans == "" {
+			// OS is not installed on this disk
+			continue
+		}
+		vminfo.RDMDisks[idx].Bootable = true
 		break
 	}
 
@@ -908,11 +924,15 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 func (migobj *Migrate) CinderManage(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
 	openstackops := migobj.Openstackclients
 	dat, err := openstackops.CinderManage(rdmDisk)
-	if err != nil {
+	if err != nil || dat == nil {
+		return nil, fmt.Errorf("failed to import LUN: %s", err)
+	}
+	str := dat["id"].(string)
+	if str == "" {
 		return nil, fmt.Errorf("failed to import LUN: %s", err)
 	}
 	// Wait for the volume to become available
-	err = openstackops.WaitForVolume(dat["id"].(string))
+	err = openstackops.WaitForVolume(str)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for volume to become available: %s", err)
 	}

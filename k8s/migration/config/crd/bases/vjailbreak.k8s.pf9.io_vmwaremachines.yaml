@@ -46,14 +46,8 @@ spec:
               vms:
                 description: VMInfo is the info of the VMs in the VMwareMachine
                 properties:
-                  annotation:
-                    type: string
                   cpu:
                     type: integer
-                  customAttributes:
-                    items:
-                      type: string
-                    type: array
                   datastores:
                     items:
                       type: string
@@ -77,20 +71,6 @@ spec:
                   rdmDisks:
                     items:
                       properties:
-                        availabilityZone:
-                          description: AvailabilityZone is the availability zone of
-                            the disk
-                          type: string
-                        bootable:
-                          description: Bootable indicates if the disk is bootable
-                          type: boolean
-                        cinderBackendPool:
-                          description: CinderBackendPool is the cinder backend pool
-                            of the disk
-                          type: string
-                        description:
-                          description: DiskMode is the mode of the disk
-                          type: string
                         diskName:
                           description: DiskName is the name of the disk
                           type: string
@@ -101,17 +81,24 @@ spec:
                         displayName:
                           description: DisplayName is the display name of the disk
                           type: string
-                        operationalState:
-                          description: OperationalState is the operational state of
-                            the disk
-                          items:
-                            type: string
-                          type: array
+                        openstackVolumeRef:
+                          description: OpenstackVolumeRef contains OpenStack volume
+                            reference information
+                          properties:
+                            cinderBackendPool:
+                              description: CinderBackendPool is the cinder backend
+                                pool of the disk
+                              type: string
+                            volumeRef:
+                              description: VolumeRef is the reference to the OpenStack
+                                volume
+                              type: string
+                            volumeType:
+                              description: VolumeType is the volume type of the disk
+                              type: string
+                          type: object
                         uuid:
                           description: UUID is the unique identifier of the disk
-                          type: string
-                        volumeType:
-                          description: VolumeType is the volume type of the disk
                           type: string
                       type: object
                     type: array
