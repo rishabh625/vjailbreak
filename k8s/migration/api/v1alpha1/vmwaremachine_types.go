@@ -22,7 +22,7 @@ import (
 
 type OpenStackVolumeRefInfo struct {
 	// VolumeRef is the reference to the OpenStack volume
-	VolumeRef string `json:"volumeRef,omitempty"`
+	VolumeRef map[string]string `json:"volumeRef,omitempty"`
 	// CinderBackendPool is the cinder backend pool of the disk
 	CinderBackendPool string `json:"cinderBackendPool,omitempty"`
 	// VolumeType is the volume type of the disk

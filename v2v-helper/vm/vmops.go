@@ -91,7 +91,7 @@ type RDMDisk struct {
 	// VolumeId is the ID of the volume
 	VolumeId string `json:"volumeId,omitempty"`
 	// OpenstackVolumeRef contains OpenStack volume reference information
-	VolumeRef string `json:"volumeRef,omitempty"`
+	VolumeRef map[string]string `json:"volumeRef,omitempty"`
 }
 
 type VMOps struct {

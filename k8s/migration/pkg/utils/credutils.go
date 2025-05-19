@@ -626,7 +626,7 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			}
 		}
 		// Get basic RDM disk info from VM properties
-		diskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
+		rdmDiskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
 		hostStorageInfo, err := GetHostStorageDeviceInfo(ctx, vm)
 		if err != nil {
 			ctxlog.Error(err, "failed to get disk info for vm skipping vm", "vm", vm.Name())
@@ -676,13 +676,12 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 							info.UUID = lunDetails.Uuid
 						}
 					}
-					diskInfos = append(diskInfos, info)
+					rdmDiskInfos = append(rdmDiskInfos, info)
 				}
 			default:
 				return nil, fmt.Errorf("unsupported disk backing type: %T", disk.Backing)
 			}
 			// Use the new method to populate RDM disk info
-			rdmDisks = PopulateRDMDiskInfoFromAttributes(diskInfos, attributes)
 			var ds mo.Datastore
 			err := pc.RetrieveOne(ctx, dsref, []string{"name"}, &ds)
 			if err != nil {
@@ -692,7 +691,11 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			datastores = AppendUnique(datastores, ds.Name)
 			disks = append(disks, disk.DeviceInfo.GetDescription().Label)
 		}
-
+		rdmDisks, err = PopulateRDMDiskInfoFromAttributes(rdmDiskInfos, attributes)
+		if err != nil {
+			ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
+			continue
+		}
 		vminfo = append(vminfo, vjailbreakv1alpha1.VMInfo{
 			Name:       vmProps.Config.Name,
 			Datastores: datastores,
@@ -977,7 +980,7 @@ func GetHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine) (*
 //			"source-id": "abac111"
 
 // PopulateRDMDiskInfoFromAttributes processes VM annotations and custom attributes to populate RDM disk information
-func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDiskInfo, attributes []string) []vjailbreakv1alpha1.RDMDiskInfo {
+func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDiskInfo, attributes []string) ([]vjailbreakv1alpha1.RDMDiskInfo, error) {
 	rdmMap := make(map[string]*vjailbreakv1alpha1.RDMDiskInfo)
 
 	// Create copies of base RDM disks to preserve existing data
@@ -1019,7 +1022,13 @@ func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDisk
 			}
 		case "volumeRef":
 			if value != "" {
-				rdmInfo.OpenstackVolumeRef.VolumeRef = value
+				splotVolRef := strings.Split(value, "=")
+				if len(splotVolRef) != 2 {
+					return nil, fmt.Errorf("invalid volume reference format: %s", rdmInfo.OpenstackVolumeRef.VolumeRef)
+				}
+				mp := make(map[string]string)
+				mp[splotVolRef[0]] = splotVolRef[1]
+				rdmInfo.OpenstackVolumeRef.VolumeRef = mp
 			}
 		}
 	}
@@ -1030,7 +1039,7 @@ func PopulateRDMDiskInfoFromAttributes(baseRDMDisks []vjailbreakv1alpha1.RDMDisk
 		rdmDisks = append(rdmDisks, *rdmInfo)
 	}
 
-	return rdmDisks
+	return rdmDisks, nil
 }
 
 func CreateServiceClient(region string, provider *gophercloud.ProviderClient) (*gophercloud.ServiceClient, error) {

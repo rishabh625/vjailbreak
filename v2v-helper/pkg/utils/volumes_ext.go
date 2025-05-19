@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
@@ -10,15 +9,16 @@ import (
 
 // ToVolumeManageMap builds the request payload for manage volume.
 func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
-	splotVolRef := strings.Split(rdmDisk.VolumeRef, "=")
-	if len(splotVolRef) != 2 {
-		return nil, fmt.Errorf("invalid volume reference format: %s", rdmDisk.VolumeRef)
+	var key, value string
+	for k, rm := range rdmDisk.VolumeRef {
+		key = k
+		value = rm
 	}
 	payload := map[string]interface{}{
 		"volume": map[string]interface{}{
 			"host": rdmDisk.CinderBackendPool,
 			"ref": map[string]string{
-				splotVolRef[0]: splotVolRef[1],
+				key: value,
 			},
 			"name":              rdmDisk.DiskName,
 			"volume_type":       rdmDisk.VolumeType,
