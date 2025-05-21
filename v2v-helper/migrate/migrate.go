@@ -248,7 +248,6 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to take snapshot of source VM: %s", err)
 	}
-	// TODO: Add namespace
 	vminfo, err = vmops.UpdateDiskInfo(vminfo)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to update disk info: %s", err)
