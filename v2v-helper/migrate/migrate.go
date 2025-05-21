@@ -450,22 +450,6 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		break
 	}
 
-	for idx, rdmdisk := range vminfo.RDMDisks {
-		// check if individual disks are bootable
-		ans, err := virtv2v.RunCommandInGuest(rdmdisk.Path, getBootCommand, false)
-		if err != nil {
-			log.Printf("Error running '%s'. Error: '%s', Output: %s\n", getBootCommand, err, strings.TrimSpace(ans))
-			continue
-		}
-
-		if ans == "" {
-			// OS is not installed on this disk
-			continue
-		}
-		vminfo.RDMDisks[idx].Bootable = true
-		break
-	}
-
 	if vminfo.OSType == "linux" {
 		if useSingleDisk {
 			// skip checking LVM, because its a single disk
@@ -883,12 +867,12 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 
 	// Import LUN and MigrateRDM disk
 	for idx, rdmDisk := range vminfo.RDMDisks {
-		volume, err := migobj.CinderManage(rdmDisk)
+		volumeID, err := migobj.CinderManage(rdmDisk)
 		if err != nil {
 			migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
 			return errors.Wrap(err, "failed to import LUN")
 		}
-		vminfo.RDMDisks[idx].VolumeId = volume["id"].(string)
+		vminfo.RDMDisks[idx].VolumeId = volumeID
 	}
 
 	err = migobj.CreateTargetInstance(vminfo, migobj.TargetFlavorId)
@@ -921,20 +905,19 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 	return nil
 }
 
-func (migobj *Migrate) CinderManage(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
+func (migobj *Migrate) CinderManage(rdmDisk vm.RDMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
-	dat, err := openstackops.CinderManage(rdmDisk)
-	if err != nil || dat == nil {
-		return nil, fmt.Errorf("failed to import LUN: %s", err)
+	volume, err := openstackops.CinderManage(rdmDisk)
+	if err != nil || volume == nil {
+		return "", fmt.Errorf("failed to import LUN: %s", err)
 	}
-	str := dat["id"].(string)
-	if str == "" {
-		return nil, fmt.Errorf("failed to import LUN: %s", err)
+	if volume.ID == "" {
+		return "", fmt.Errorf("failed to import LUN: %s", err)
 	}
 	// Wait for the volume to become available
-	err = openstackops.WaitForVolume(str)
+	err = openstackops.WaitForVolume(volume.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to wait for volume to become available: %s", err)
+		return "", fmt.Errorf("failed to wait for volume to become available: %s", err)
 	}
-	return dat, nil
+	return volume.ID, nil
 }

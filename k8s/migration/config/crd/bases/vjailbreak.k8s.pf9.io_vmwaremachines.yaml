@@ -90,9 +90,11 @@ spec:
                                 pool of the disk
                               type: string
                             volumeRef:
+                              additionalProperties:
+                                type: string
                               description: VolumeRef is the reference to the OpenStack
                                 volume
-                              type: string
+                              type: object
                             volumeType:
                               description: VolumeType is the volume type of the disk
                               type: string

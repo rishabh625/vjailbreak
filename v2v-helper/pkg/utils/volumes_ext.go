@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 )
 
@@ -23,7 +24,7 @@ func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
 			"name":              rdmDisk.DiskName,
 			"volume_type":       rdmDisk.VolumeType,
 			"description":       fmt.Sprintf("Volume for %s", rdmDisk.DiskName),
-			"bootable":          rdmDisk.Bootable,
+			"bootable":          false,
 			"availability_zone": nil,
 		},
 	}
@@ -31,22 +32,20 @@ func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
 }
 
 // Manage triggers the volume manage request.
-
-func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
+func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error) {
 	body, err := ToVolumeManageMap(rdmDisk)
 	if err != nil {
 		return nil, err
 	}
 
-	var result map[string]interface{}
+	var result volumes.Volume
 	_, err = osclient.BlockStorageClient.Post(osclient.BlockStorageClient.ServiceURL("manageable_volumes"), body, &result, &gophercloud.RequestOpts{
-		OkCodes:      []int{202},
-		MoreHeaders:  map[string]string{"OpenStack-API-Version": "volume 3.8"},
-		JSONResponse: &result,
+		OkCodes:     []int{202},
+		MoreHeaders: map[string]string{"OpenStack-API-Version": "volume 3.8"},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return &result, nil
 }
