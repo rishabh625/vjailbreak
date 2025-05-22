@@ -419,18 +419,19 @@ func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) 
 	// Convert VM name to k8s compatible name
 	sanitizedVMName := ConvertToK8sName(vmName)
 
-	// Create VMwareMachine objet
+	// Create VMwareMachine object
 	vmwareMachine := &vjailbreakv1alpha1.VMwareMachine{}
 
 	// Create namespaced name for lookup
 	namespacedName := k8stypes.NamespacedName{
-		Name: sanitizedVMName,
+		Name:      sanitizedVMName,    // Use the sanitized VM name
+		Namespace: "migration-system", // Specify the namespace
 	}
 
 	// Get VMwareMachine object
 	if err := client.Get(ctx, namespacedName, vmwareMachine); err != nil {
 		if k8serrors.IsNotFound(err) {
-			return nil, fmt.Errorf("VMwareMachine '%s' not found in namespace '%s'", sanitizedVMName, "migration-system")
+			return nil, fmt.Errorf("VMwareMachine '%s' not found in namespace '%s'", sanitizedVMName, namespacedName.Namespace)
 		}
 		return nil, fmt.Errorf("failed to get VMwareMachine: %w", err)
 	}
