@@ -416,13 +416,6 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		}
 	}
 
-	for idx, rdmdisk := range vminfo.RDMDisks {
-		vminfo.RDMDisks[idx].Path, err = migobj.AttachVolume(rdmdisk.VolumeId)
-		if err != nil {
-			return fmt.Errorf("failed to attach volume for RDM: %s", err)
-		}
-	}
-
 	// create XML for conversion
 	err = utils.GenerateXMLConfig(vminfo)
 	if err != nil {
@@ -854,16 +847,6 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		return errors.Wrap(err, "failed to live replicate disks")
 	}
 
-	// Convert the Boot Disk to raw format
-	err = migobj.ConvertVolumes(ctx, vminfo)
-	if err != nil {
-		if cleanuperror := migobj.cleanup(vminfo, fmt.Sprintf("failed to convert volumes: %s", err)); cleanuperror != nil {
-			// combine both errors
-			return errors.Wrapf(err, "failed to convert disks: %s", cleanuperror)
-		}
-		return errors.Wrap(err, "failed to convert disks")
-	}
-
 	// Import LUN and MigrateRDM disk
 	for idx, rdmDisk := range vminfo.RDMDisks {
 		volumeID, err := migobj.CinderManage(rdmDisk)
@@ -872,6 +855,16 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 			return errors.Wrap(err, "failed to import LUN")
 		}
 		vminfo.RDMDisks[idx].VolumeId = volumeID
+	}
+
+	// Convert the Boot Disk to raw format
+	err = migobj.ConvertVolumes(ctx, vminfo)
+	if err != nil {
+		if cleanuperror := migobj.cleanup(vminfo, fmt.Sprintf("failed to convert volumes: %s", err)); cleanuperror != nil {
+			// combine both errors
+			return errors.Wrapf(err, "failed to convert disks: %s", cleanuperror)
+		}
+		return errors.Wrap(err, "failed to convert disks")
 	}
 
 	err = migobj.CreateTargetInstance(vminfo, migobj.TargetFlavorId)

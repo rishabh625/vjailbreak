@@ -440,6 +440,13 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 		}
 	}
 
+	for _, disk := range vminfo.RDMDisks {
+		err := osclient.WaitForVolume(disk.VolumeId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wait for volume to become available: %s", err)
+		}
+	}
+
 	server, err := servers.Create(osclient.ComputeClient, createOpts).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %s", err)
@@ -457,6 +464,17 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 	for _, disk := range append(vminfo.VMDisks[:bootableDiskIndex], vminfo.VMDisks[bootableDiskIndex+1:]...) {
 		_, err := volumeattach.Create(osclient.ComputeClient, server.ID, volumeattach.CreateOpts{
 			VolumeID:            disk.OpenstackVol.ID,
+			DeleteOnTermination: false,
+		}).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("failed to attach volume to VM: %s", err)
+		}
+	}
+	log.Println("Attaching RDM Disks")
+
+	for _, disk := range vminfo.RDMDisks {
+		_, err := volumeattach.Create(osclient.ComputeClient, server.ID, volumeattach.CreateOpts{
+			VolumeID:            disk.VolumeId,
 			DeleteOnTermination: false,
 		}).Extract()
 		if err != nil {
