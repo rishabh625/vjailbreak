@@ -68,6 +68,42 @@ spec:
                     type: array
                   osType:
                     type: string
+                  rdmDisks:
+                    items:
+                      properties:
+                        diskName:
+                          description: DiskName is the name of the disk
+                          type: string
+                        diskSize:
+                          description: DiskSize is the size of the disk in GB
+                          format: int64
+                          type: integer
+                        displayName:
+                          description: DisplayName is the display name of the disk
+                          type: string
+                        openstackVolumeRef:
+                          description: OpenstackVolumeRef contains OpenStack volume
+                            reference information
+                          properties:
+                            cinderBackendPool:
+                              description: CinderBackendPool is the cinder backend
+                                pool of the disk
+                              type: string
+                            volumeRef:
+                              additionalProperties:
+                                type: string
+                              description: VolumeRef is the reference to the OpenStack
+                                volume
+                              type: object
+                            volumeType:
+                              description: VolumeType is the volume type of the disk
+                              type: string
+                          type: object
+                        uuid:
+                          description: UUID is the unique identifier of the disk
+                          type: string
+                      type: object
+                    type: array
                   vmState:
                     type: string
                 required:
