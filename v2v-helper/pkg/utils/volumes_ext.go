@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
@@ -52,24 +51,7 @@ func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Vol
 	if response != nil && response.Body != nil {
 		defer response.Body.Close()
 	}
-	if result != nil {
-		volume, ok := result["volume"].(map[string]interface{})
-		fmt.Println("Volume:", volume)
-		if !ok {
-			jsonData, err := json.Marshal(volume)
-			fmt.Println("jsonData:", string(jsonData))
-			if err != nil {
-				return nil, err
-			}
-			var volumeResult volumes.Volume
-			err = json.Unmarshal(jsonData, &volumeResult)
-			fmt.Println("vol:", volumeResult)
-			if err != nil {
-				return nil, err
-			}
-			return &volumeResult, nil
-		}
-	}
+
 	volume, _ := result["volume"].(map[string]interface{})
 
 	id := volume["id"]
@@ -77,5 +59,4 @@ func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Vol
 		ID: id.(string),
 	}
 	return &v, nil
-	//return nil, errors.New("failed: Cinder manage volume request")
 }
