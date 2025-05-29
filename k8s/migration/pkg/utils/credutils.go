@@ -629,8 +629,6 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 					for _, scsiDisk := range hostStorageInfo.ScsiLun {
 
 						lunDetails := scsiDisk.GetScsiLun()
-						fmt.Printf("Lun details: %v\n disk name %s, backing info %v ", lunDetails, info.DiskName, backing)
-						fmt.Printf("Lun details: %v\n backing info %v ", lunDetails.Uuid, backing.Uuid)
 						if backing.LunUuid == lunDetails.Uuid {
 							info.DisplayName = lunDetails.DisplayName
 							info.UUID = lunDetails.Uuid
