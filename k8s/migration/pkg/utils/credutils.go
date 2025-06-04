@@ -900,17 +900,7 @@ func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 		}
 
 		// Update fields only if new value is provided
-		switch key {
-		case "cinderBackendPool":
-			if value != "" {
-				rdmInfo.OpenstackVolumeRef.CinderBackendPool = value
-			}
-		case "volumeType":
-			if value != "" {
-				rdmInfo.OpenstackVolumeRef.VolumeType = value
-			}
-		case "volumeRef":
-			if value != "" {
+		if key== "volumeRef" && value != "" {
 				splotVolRef := strings.Split(value, "=")
 				if len(splotVolRef) != 2 {
 					return nil, fmt.Errorf("invalid volume reference format: %s", rdmInfo.OpenstackVolumeRef.VolumeRef)
@@ -918,7 +908,6 @@ func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 				mp := make(map[string]string)
 				mp[splotVolRef[0]] = splotVolRef[1]
 				rdmInfo.OpenstackVolumeRef.VolumeRef = mp
-			}
 		}
 	}
 
