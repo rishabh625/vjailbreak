@@ -222,6 +222,12 @@ spec:
                       description: Human-readable message indicating details about
                         last transition.
                       type: string
+                    observedGeneration:
+                      description: |-
+                        If set, this represents the .metadata.generation that the pod condition was set based upon.
+                        This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+                      format: int64
+                      type: integer
                     reason:
                       description: Unique, one-word, CamelCase reason for the condition's
                         last transition.
@@ -1655,7 +1661,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/platform9/vjailbreak-controller:v0.1.8
+        image: quay.io/platform9/vjailbreak-controller:v0.1.12
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -1674,14 +1680,11 @@ spec:
           requests:
             cpu: 200m
             memory: 256Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
         volumeMounts:
         - mountPath: /etc/pf9/k3s
           name: master-token
+        - mountPath: /home/ubuntu
+          name: vddk
       hostNetwork: true
       securityContext:
         runAsGroup: 0
@@ -1693,3 +1696,7 @@ spec:
           path: /var/lib/rancher/k3s/server
           type: Directory
         name: master-token
+      - hostPath:
+          path: /home/ubuntu
+          type: Directory
+        name: vddk

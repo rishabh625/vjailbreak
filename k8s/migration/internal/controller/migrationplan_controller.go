@@ -328,6 +328,7 @@ func (r *MigrationPlanReconciler) CreateJob(ctx context.Context,
 						},
 					},
 				},
+				TTLSecondsAfterFinished: nil,
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
@@ -399,6 +400,10 @@ func (r *MigrationPlanReconciler) CreateJob(ctx context.Context,
 										Name:      "firstboot",
 										MountPath: "/home/fedora/scripts",
 									},
+									{
+										Name:      "logs",
+										MountPath: "/var/log/pf9",
+									},
 								},
 								Resources: corev1.ResourceRequirements{
 									Requests: corev1.ResourceList{
@@ -440,6 +445,15 @@ func (r *MigrationPlanReconciler) CreateJob(ctx context.Context,
 										LocalObjectReference: corev1.LocalObjectReference{
 											Name: firstbootconfigMapName,
 										},
+									},
+								},
+							},
+							{
+								Name: "logs",
+								VolumeSource: corev1.VolumeSource{
+									HostPath: &corev1.HostPathVolumeSource{
+										Path: "/var/log/pf9",
+										Type: utils.NewHostPathType("DirectoryOrCreate"),
 									},
 								},
 							},
@@ -566,7 +580,7 @@ func (r *MigrationPlanReconciler) CreateMigrationConfigMap(ctx context.Context,
 				return nil, fmt.Errorf("failed to get OpenStack clients: %w", err)
 			}
 			var flavor *flavors.Flavor
-			flavor, err = utils.GetClosestFlavour(ctx, vmMachine.Spec.VMs.CPU, vmMachine.Spec.VMs.Memory, computeClient.ComputeClient)
+			flavor, err = utils.GetClosestFlavour(vmMachine.Spec.VMs.CPU, vmMachine.Spec.VMs.Memory, computeClient.ComputeClient)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get closest flavor: %w", err)
 			}
@@ -749,7 +763,6 @@ func (r *MigrationPlanReconciler) TriggerMigration(ctx context.Context,
 		vmMachineObj = nil
 		for i := range vmMachines.Items {
 			if vmMachines.Items[i].Spec.VMs.Name == vm {
-				ctxlog.Info(fmt.Sprintf("Found VMwareMachineobject '%v'", vmMachines.Items[i]))
 				vmMachineObj = &vmMachines.Items[i]
 				break
 			}

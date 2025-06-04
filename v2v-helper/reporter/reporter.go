@@ -5,11 +5,11 @@ package reporter
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"strings"
 
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,7 +90,7 @@ func (r *Reporter) GetPod() error {
 func NewReporter() (*Reporter, error) {
 	r := &Reporter{}
 	if IsRunningInPod() {
-		log.Println("Running in pod")
+		utils.PrintLog("Running in pod")
 		if err := r.GetPodName(); err != nil {
 			return nil, err
 		}
@@ -104,7 +104,7 @@ func NewReporter() (*Reporter, error) {
 			return nil, err
 		}
 	} else {
-		log.Println("Not running in pod")
+		utils.PrintLog("Not running in pod")
 		os.Exit(1)
 	}
 	return r, nil
@@ -197,11 +197,11 @@ func (r *Reporter) UpdatePodEvents(ctx context.Context, ch <-chan string, ackCha
 					return
 				}
 				if err := r.UpdateProgress(msg); err != nil {
-					log.Println(err)
+					utils.PrintLog(err.Error())
 				}
 				if !strings.Contains(msg, "Progress:") {
 					if err := r.CreateKubernetesEvent(ctx, corev1.EventTypeNormal, "Migration", msg); err != nil {
-						log.Println(err)
+						utils.PrintLog(err.Error())
 					}
 				}
 				// Sending acknowledgment that the message has been processed

@@ -63,7 +63,7 @@ type MigrationTimes struct {
 }
 
 func (migobj *Migrate) logMessage(message string) {
-	log.Println(message)
+	utils.PrintLog(message)
 	if migobj.InPod {
 		migobj.EventReporter <- message
 	}
@@ -161,7 +161,7 @@ func (migobj *Migrate) DeleteAllVolumes(vminfo vm.VMInfo) error {
 		if err != nil {
 			return fmt.Errorf("failed to delete volume: %s", err)
 		}
-		log.Printf("Volume %s deleted\n", vmdisk.Name)
+		utils.PrintLog(fmt.Sprintf("Volume %s deleted\n", vmdisk.Name))
 	}
 	return nil
 }
@@ -191,12 +191,12 @@ func (migobj *Migrate) EnableCBTWrapper() error {
 		if err != nil {
 			return fmt.Errorf("failed to take snapshot of source VM: %s", err)
 		}
-		log.Println("Snapshot created successfully")
+		utils.PrintLog("Snapshot created successfully")
 		err = vmops.DeleteSnapshot("tmp-snap")
 		if err != nil {
 			return fmt.Errorf("failed to delete snapshot of source VM: %s", err)
 		}
-		fmt.Println("Snapshot deleted successfully")
+		utils.PrintLog("Snapshot deleted successfully")
 		migobj.logMessage("CBT enabled successfully")
 	}
 	return nil
@@ -243,7 +243,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		}
 	}
 
-	log.Println("Starting NBD server")
+	utils.PrintLog("Starting NBD server")
 	err := vmops.TakeSnapshot(constants.MigrationSnapshotName)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to take snapshot of source VM: %s", err)
@@ -302,7 +302,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 				} else {
 					migobj.logMessage(fmt.Sprintf("Disk %d: Blocks have Changed.", idx))
 
-					log.Println("Restarting NBD server")
+					utils.PrintLog("Restarting NBD server")
 					err = nbdops[idx].StopNBDServer()
 					if err != nil {
 						return vminfo, fmt.Errorf("failed to stop NBD server: %s", err)
@@ -331,7 +331,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 				break
 			}
 			if done || incrementalCopyCount > 20 {
-				log.Println("Shutting down source VM and performing final copy")
+				utils.PrintLog("Shutting down source VM and performing final copy")
 				if err := migobj.WaitforCutover(); err != nil {
 					return vminfo, fmt.Errorf("failed to start VM Cutover: %s", err)
 				}
@@ -373,7 +373,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		return vminfo, errors.Wrap(err, "Failed to detach all volumes from VM")
 	}
 
-	log.Println("Stopping NBD server")
+	utils.PrintLog("Stopping NBD server")
 	for _, nbdserver := range nbdops {
 		err = nbdserver.StopNBDServer()
 		if err != nil {
@@ -381,10 +381,11 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		}
 	}
 
-	log.Println("Deleting migration snapshot")
+	utils.PrintLog("Deleting migration snapshot")
 	err = vmops.DeleteSnapshot(constants.MigrationSnapshotName)
 	if err != nil {
-		return vminfo, fmt.Errorf("failed to delete snapshot of source VM: %s", err)
+		migobj.logMessage(fmt.Sprintf(`Failed to delete snapshot of source VM: %s, since copy is completed, 
+		continuing with the migration`, err))
 	}
 	return vminfo, nil
 }
@@ -426,7 +427,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		// check if individual disks are bootable
 		ans, err := virtv2v.RunCommandInGuest(vminfo.VMDisks[idx].Path, getBootCommand, false)
 		if err != nil {
-			log.Printf("Error running '%s'. Error: '%s', Output: %s\n", getBootCommand, err, strings.TrimSpace(ans))
+			utils.PrintLog(fmt.Sprintf("Error running '%s'. Error: '%s', Output: %s\n", getBootCommand, err, strings.TrimSpace(ans)))
 			continue
 		}
 
@@ -434,7 +435,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 			// OS is not installed on this disk
 			continue
 		}
-		log.Printf("Output from '%s' - '%s'\n", getBootCommand, strings.TrimSpace(ans))
+		utils.PrintLog(fmt.Sprintf("Output from '%s' - '%s'\n", getBootCommand, strings.TrimSpace(ans)))
 
 		osPath = strings.TrimSpace(ans)
 		bootVolumeIndex = idx
@@ -467,7 +468,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 			}
 		}
 		osDetected := strings.ToLower(strings.TrimSpace(osRelease))
-		fmt.Printf("OS detected by guestfish: %s", osDetected)
+		utils.PrintLog(fmt.Sprintf("OS detected by guestfish: %s", osDetected))
 		// Supported OSes
 		supportedOS := []string{
 			"redhat",
@@ -495,16 +496,16 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		if !supported {
 			return fmt.Errorf("unsupported OS detected by guestfish: %s", osDetected)
 		}
-		log.Println("OS compatibility check passed")
+		utils.PrintLog("OS compatibility check passed")
 
 	} else if vminfo.OSType == "windows" {
-		log.Println("OS compatibility check passed")
+		utils.PrintLog("OS compatibility check passed")
 	} else {
 		return fmt.Errorf("unsupported OS type: %s", vminfo.OSType)
 	}
 
 	// save the index of bootVolume
-	log.Printf("Setting up boot volume as: %s", vminfo.VMDisks[bootVolumeIndex].Name)
+	utils.PrintLog(fmt.Sprintf("Setting up boot volume as: %s", vminfo.VMDisks[bootVolumeIndex].Name))
 	vminfo.VMDisks[bootVolumeIndex].Boot = true
 	if migobj.Convert {
 		firstbootscripts := []string{}
@@ -544,12 +545,12 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	if vminfo.OSType == "linux" {
 		if strings.Contains(osRelease, "ubuntu") {
 			// Add Wildcard Netplan
-			log.Println("Adding wildcard netplan")
+			utils.PrintLog("Adding wildcard netplan")
 			err := virtv2v.AddWildcardNetplan(vminfo.VMDisks, useSingleDisk, vminfo.VMDisks[bootVolumeIndex].Path)
 			if err != nil {
 				return fmt.Errorf("failed to add wildcard netplan: %s", err)
 			}
-			log.Println("Wildcard netplan added successfully")
+			utils.PrintLog("Wildcard netplan added successfully")
 		}
 	}
 	err = migobj.DetachAllVolumes(vminfo)
@@ -572,7 +573,7 @@ func (migobj *Migrate) CreateTargetInstance(vminfo vm.VMInfo, flavorId string) e
 		if err != nil {
 			return fmt.Errorf("failed to get closest OpenStack flavor: %s", err)
 		}
-		log.Printf("Closest OpenStack flavor: %s: CPU: %dvCPUs\tMemory: %dMB\n", flavor.Name, flavor.VCPUs, flavor.RAM)
+		utils.PrintLog(fmt.Sprintf("Closest OpenStack flavor: %s: CPU: %dvCPUs\tMemory: %dMB\n", flavor.Name, flavor.VCPUs, flavor.RAM))
 	} else {
 		flavor, err = openstackops.GetFlavor(flavorId)
 		if err != nil {
@@ -621,7 +622,7 @@ func (migobj *Migrate) CreateTargetInstance(vminfo vm.VMInfo, flavorId string) e
 				return fmt.Errorf("failed to create port group: %s", err)
 			}
 
-			log.Printf("Port created successfully: MAC:%s IP:%s\n", port.MACAddress, port.FixedIPs[0].IPAddress)
+			utils.PrintLog(fmt.Sprintf("Port created successfully: MAC:%s IP:%s\n", port.MACAddress, port.FixedIPs[0].IPAddress))
 			networkids = append(networkids, network.ID)
 			portids = append(portids, port.ID)
 			ipaddresses = append(ipaddresses, port.FixedIPs[0].IPAddress)
@@ -636,7 +637,7 @@ func (migobj *Migrate) CreateTargetInstance(vminfo vm.VMInfo, flavorId string) e
 
 	// Wait for VM to become active
 	for i := 0; i < constants.MaxVMActiveCheckCount; i++ {
-		log.Printf("Waiting for VM to become active: %d/%d retries\n", i+1, constants.MaxVMActiveCheckCount)
+		utils.PrintLog(fmt.Sprintf("Waiting for VM to become active: %d/%d retries\n", i+1, constants.MaxVMActiveCheckCount))
 		active, err := openstackops.WaitUntilVMActive(newVM.ID)
 		if err != nil {
 			return fmt.Errorf("failed to wait for VM to become active: %s", err)
@@ -824,17 +825,9 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		return errors.Wrap(err, "CBT Failure")
 	}
 
-	debug, err := utils.IsDebug(ctx, migobj.K8sClient)
-	if err != nil {
-		return errors.Wrap(err, "Failed to get debug value")
-	}
-
 	// Create NBD servers
 	for range vminfo.VMDisks {
-		migobj.Nbdops = append(migobj.Nbdops, &nbd.NBDServer{
-			// Add debug
-			Debug: debug,
-		})
+		migobj.Nbdops = append(migobj.Nbdops, &nbd.NBDServer{})
 	}
 
 	// Live Replicate Disks
@@ -883,15 +876,15 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 	migobj.logMessage(fmt.Sprintf("%s. Trying to perform cleanup", message))
 	err := migobj.DetachAllVolumes(vminfo)
 	if err != nil {
-		log.Printf("Failed to detach all volumes from VM: %s\n", err)
+		utils.PrintLog(fmt.Sprintf("Failed to detach all volumes from VM: %s\n", err))
 	}
 	err = migobj.DeleteAllVolumes(vminfo)
 	if err != nil {
-		log.Printf("Failed to delete all volumes from host: %s\n", err)
+		utils.PrintLog(fmt.Sprintf("Failed to delete all volumes from host: %s\n", err))
 	}
 	err = migobj.VMops.DeleteSnapshot(constants.MigrationSnapshotName)
 	if err != nil {
-		log.Printf("Failed to delete snapshot of source VM: %s\n", err)
+		utils.PrintLog(fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))
 		return errors.Wrap(err, fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))
 	}
 	return nil

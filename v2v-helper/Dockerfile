@@ -40,7 +40,7 @@ RUN dnf install -y \
     nbdkit \
     nbdkit-vddk-plugin \
     libnbd \
-    virt-v2v \
+    virt-v2v-2.7.13 \
     virtio-win && \
     dnf clean all && \
     rm -rf /var/cache/dnf

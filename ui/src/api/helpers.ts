@@ -20,12 +20,12 @@ import {
 } from "./storage-mappings/storageMappings"
 import {
   deleteVmwareCredentials,
-  
   getVmwareCredentialsList,
 } from "./vmware-creds/vmwareCreds"
 import {
   createOpenstackCredsSecret,
   createVMwareCredsSecret,
+  deleteSecret,
 } from "./secrets/secrets"
 import { createOpenstackCredsWithSecret } from "./openstack-creds/openstackCreds"
 import { createVMwareCredsWithSecret } from "./vmware-creds/vmwareCreds"
@@ -118,28 +118,19 @@ export const createOpenstackCredsWithSecretFlow = async (
 // Create VMware credentials with secret
 export const createVMwareCredsWithSecretFlow = async (
   credName: string,
-  credentials: {
-    VCENTER_HOST: string
-    VCENTER_USERNAME: string
-    VCENTER_DATACENTER: string
-    VCENTER_PASSWORD: string
-  },
+  credentials,
   namespace = VJAILBREAK_DEFAULT_NAMESPACE
 ) => {
   const secretName = `${credName}-vmware-secret`
 
-  const vmwareCredentialsWithInsecure = {
-    ...credentials,
-    VCENTER_INSECURE: true,
-  }
+  await createVMwareCredsSecret(secretName, credentials, namespace)
 
-  await createVMwareCredsSecret(
+  return createVMwareCredsWithSecret(
+    credName,
     secretName,
-    vmwareCredentialsWithInsecure,
-    namespace
+    namespace,
+    credentials.VCENTER_DATACENTER
   )
-
-  return createVMwareCredsWithSecret(credName, secretName, namespace, credentials.VCENTER_DATACENTER)
 }
 
 export const deleteVMwareCredsWithSecretFlow = async (
@@ -147,7 +138,9 @@ export const deleteVMwareCredsWithSecretFlow = async (
   namespace = VJAILBREAK_DEFAULT_NAMESPACE
 ) => {
   try {
+    const secretName = `${credName}-vmware-secret`
     await deleteVmwareCredentials(credName, namespace)
+    await deleteSecret(secretName, namespace)
     return { success: true }
   } catch (error) {
     console.error(`Error deleting VMware credential ${credName}:`, error)
@@ -161,7 +154,9 @@ export const deleteOpenStackCredsWithSecretFlow = async (
   namespace = VJAILBREAK_DEFAULT_NAMESPACE
 ) => {
   try {
+    const secretName = `${credName}-openstack-secret`
     await deleteOpenstackCredentials(credName, namespace)
+    await deleteSecret(secretName, namespace)
     return { success: true }
   } catch (error) {
     console.error(`Error deleting OpenStack credential ${credName}:`, error)

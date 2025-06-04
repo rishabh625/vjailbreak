@@ -17,7 +17,7 @@ systemctl enable --now serial-getty@ttyS0.service`
 	MaxRAM = 9999999
 
 	// Number of intervals to wait for the volume to become available
-	MaxIntervalCount = 12
+	MaxIntervalCount = 60
 
 	InspectOSCommand         = "inspect-os"
 	LSBootCommand            = "ls /boot"
@@ -28,6 +28,8 @@ systemctl enable --now serial-getty@ttyS0.service`
 	VMActiveCheckInterval    = 20 * time.Second
 	MigrationSystemNamespace = "migration-system"
 	TrueString               = "true"
+
+	LogsDir = "/var/log/pf9"
 
 	EventMessageConvertingDisk                    = "Converting disk"
 	EventMessageWaitingForCutOverStart            = "Waiting for VM Cutover start time"

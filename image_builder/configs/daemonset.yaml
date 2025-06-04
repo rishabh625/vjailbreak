@@ -45,6 +45,8 @@ spec:
               readOnly: true
             - name: vmwarelib
               mountPath: /home/ubuntu/vmware-vix-disklib-distrib
+            - name: logs
+              mountPath: /var/log/pf9
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -67,6 +69,13 @@ spec:
                   mkdir -p /home/ubuntu/vmware-vix-disklib-distrib/
                   echo "Syncing from rsync://${MASTER_IP}"
                   rsync -avz rsync://${MASTER_IP}/vmwarelib/ /home/ubuntu/vmware-vix-disklib-distrib/
+
+                  # Sync logs from worker to master 
+                  rsync -avz /var/log/pf9 rsync://${MASTER_IP}/worker-logs
+
+                  # Also Sync logs from master to worker
+                  rsync -avz rsync://${MASTER_IP}/master-logs /var/log/pf9
+
                   if [ $? -eq 0 ]; then
                     echo "Sync completed successfully."
                   else
@@ -79,12 +88,12 @@ spec:
         - name: pf9-env
           hostPath:
             path: /etc/pf9
-            type: Directory
+            type: DirectoryOrCreate
         - name: vmwarelib
           hostPath:
             path: /home/ubuntu/vmware-vix-disklib-distrib
             type: DirectoryOrCreate
-        - name: env
+        - name: logs
           hostPath:
-            type: Directory
-            path: /etc/pf9/env
+            type: DirectoryOrCreate
+            path: /var/log/pf9

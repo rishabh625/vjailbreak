@@ -3,9 +3,11 @@ package utils
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
@@ -89,4 +91,47 @@ func IsDebug(ctx context.Context, client client.Client) (bool, error) {
 	}
 	debug := strings.TrimSpace(string(configMap.Data["DEBUG"]))
 	return debug == constants.TrueString, nil
+}
+
+func PrintLog(logMessage string) error {
+	log.Println(logMessage)
+	return WriteToLogFile(logMessage)
+}
+
+func GetMigrationObjectName() (string, error) {
+	vmname := os.Getenv("SOURCE_VM_NAME")
+	vmK8sName, err := ConvertToK8sName(vmname)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("migration-%s", vmK8sName), nil
+}
+
+func WriteToLogFile(message string) error {
+	// Get migration object name from environment variable
+	migrationName, err := GetMigrationObjectName()
+	if err != nil {
+		return errors.Wrap(err, "failed to get migration object name")
+	}
+
+	// Ensure the logs directory exists
+	if err := os.MkdirAll(constants.LogsDir, 0755); err != nil {
+		return errors.Wrap(err, "failed to create logs directory")
+	}
+
+	// Create log file with the migration object name
+	logFilePath := fmt.Sprintf("%s/%s.log", constants.LogsDir, migrationName)
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to create log file")
+	}
+	defer logFile.Close()
+
+	logMessage := fmt.Sprintf("[%s] %s\n", time.Now().Format(time.RFC3339), message)
+
+	// Write the log message
+	if _, err := logFile.WriteString(logMessage); err != nil {
+		return errors.Wrap(err, "failed to write log message to log file")
+	}
+	return nil
 }

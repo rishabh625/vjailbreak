@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -38,7 +37,6 @@ type NBDServer struct {
 	cmd          *exec.Cmd
 	tmp_dir      string
 	progresschan chan string
-	Debug        bool
 }
 
 type BlockStatusData struct {
@@ -128,11 +126,10 @@ vixDiskLib.nfcAio.Session.BufCount=4`
 			cmdstring += fmt.Sprintf("%s ", arg)
 		}
 	}
-	if nbdserver.Debug {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-	log.Printf("Executing %s\n", cmdstring)
+
+	utils.AddDebugOutputToFile(cmd)
+
+	utils.PrintLog(fmt.Sprintf("Executing %s\n", cmdstring))
 	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start nbdkit: %v", err)
@@ -164,18 +161,18 @@ func (nbdserver *NBDServer) CopyDisk(ctx context.Context, dest string, diskindex
 	cmd := exec.CommandContext(ctx, "nbdcopy", "--progress=3", "--target-is-zero", generateSockUrl(nbdserver.tmp_dir), dest)
 	cmd.ExtraFiles = []*os.File{progressWrite}
 
-	log.Println(cmd.String())
+	utils.PrintLog(fmt.Sprintf("Executing %s\n", cmd.String()))
 	go func() {
 		scanner := bufio.NewScanner(progressRead)
 		lastProgress := 0
 		for scanner.Scan() {
 			progressInt, _, err := utils.ParseFraction(scanner.Text())
 			if err != nil {
-				log.Printf("Error converting progress percent to int: %v", err)
+				utils.PrintLog(fmt.Sprintf("Error converting progress percent to int: %v", err))
 				continue
 			}
 			msg := fmt.Sprintf("Copying disk %d, Completed: %d%%", diskindex, progressInt)
-			log.Println(msg)
+			utils.PrintLog(msg)
 
 			if lastProgress <= progressInt-10 {
 				nbdserver.progresschan <- msg
@@ -183,10 +180,7 @@ func (nbdserver *NBDServer) CopyDisk(ctx context.Context, dest string, diskindex
 			}
 		}
 	}()
-	if nbdserver.Debug {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
+	utils.AddDebugOutputToFile(cmd)
 	err = cmd.Run()
 	if err != nil {
 		// retry once with debug enabled, to get more details
@@ -206,21 +200,21 @@ func getBlockStatus(handle *libnbd.Libnbd, extent types.DiskChangeExtent) []*Blo
 	// Callback for libnbd.BlockStatus. Needs to modify blocks list above.
 	updateBlocksCallback := func(metacontext string, nbdOffset uint64, extents []uint32, err *int) int {
 		if nbdOffset > math.MaxInt64 {
-			log.Printf("Block status offset too big for conversion: 0x%x", nbdOffset)
+			utils.PrintLog(fmt.Sprintf("Block status offset too big for conversion: 0x%x", nbdOffset))
 			return -2
 		}
 		offset := int64(nbdOffset)
 
 		if *err != 0 {
-			log.Printf("Block status callback error at offset %d: error code %d", offset, *err)
+			utils.PrintLog(fmt.Sprintf("Block status callback error at offset %d: error code %d", offset, *err))
 			return *err
 		}
 		if metacontext != "base:allocation" {
-			log.Printf("Offset %d not base:allocation, ignoring", offset)
+			utils.PrintLog(fmt.Sprintf("Offset %d not base:allocation, ignoring", offset))
 			return 0
 		}
 		if (len(extents) % 2) != 0 {
-			log.Printf("Block status entry at offset %d has unexpected length %d!", offset, len(extents))
+			utils.PrintLog(fmt.Sprintf("Block status entry at offset %d has unexpected length %d!", offset, len(extents)))
 			return -1
 		}
 		for i := 0; i < len(extents); i += 2 {
@@ -277,13 +271,13 @@ func getBlockStatus(handle *libnbd.Libnbd, extent types.DiskChangeExtent) []*Blo
 		}
 		err := handle.BlockStatus(uint64(length), uint64(lastOffset), updateBlocksCallback, &fixedOptArgs)
 		if err != nil {
-			log.Printf("Error getting block status at offset %d, returning whole block instead. Error was: %v", lastOffset, err)
+			utils.PrintLog(fmt.Sprintf("Error getting block status at offset %d, returning whole block instead. Error was: %v", lastOffset, err))
 			return createWholeBlock()
 		}
 		last := len(blocks) - 1
 		newOffset := blocks[last].Offset + blocks[last].Length
 		if lastOffset == newOffset {
-			log.Printf("No new block status data at offset %d, returning whole block.", newOffset)
+			utils.PrintLog(fmt.Sprintf("No new block status data at offset %d, returning whole block.", newOffset))
 			return createWholeBlock()
 		}
 		lastOffset = newOffset
@@ -300,7 +294,7 @@ func pwrite(fd *os.File, buffer []byte, offset uint64) (int, error) {
 		return -1, errors.Wrapf(err, "failed to write %d bytes at offset %d", blocksize, offset)
 	}
 	if written < blocksize {
-		log.Printf("Wrote less than blocksize (%d): %d", blocksize, written)
+		utils.PrintLog(fmt.Sprintf("Wrote less than blocksize (%d): %d", blocksize, written))
 	}
 	return written, nil
 }
@@ -308,7 +302,7 @@ func pwrite(fd *os.File, buffer []byte, offset uint64) (int, error) {
 // zeroRange fills the destination range with zero bytes
 func zeroRange(fd *os.File, offset int64, length int64) error {
 	punch := func(offset int64, length int64) error {
-		log.Printf("Punching %d-byte hole at offset %d", length, offset)
+		utils.PrintLog(fmt.Sprintf("Punching %d-byte hole at offset %d", length, offset))
 		flags := uint32(unix.FALLOC_FL_PUNCH_HOLE | unix.FALLOC_FL_KEEP_SIZE)
 		return syscall.Fallocate(int(fd.Fd()), flags, offset, length)
 	}
@@ -319,7 +313,7 @@ func zeroRange(fd *os.File, offset int64, length int64) error {
 	}
 
 	if err != nil { // Fall back to regular pwrite
-		log.Printf("Unable to zero range %d - %d on destination, falling back to pwrite: %v", offset, offset+length, err)
+		utils.PrintLog(fmt.Sprintf("Unable to zero range %d - %d on destination, falling back to pwrite: %v", offset, offset+length, err))
 		count := int64(0)
 		const blocksize = 16 << 20
 		buffer := bytes.Repeat([]byte{0}, blocksize)
@@ -330,7 +324,7 @@ func zeroRange(fd *os.File, offset int64, length int64) error {
 			}
 			written, err := pwrite(fd, buffer, uint64(offset))
 			if err != nil {
-				log.Printf("Unable to write %d zeroes at offset %d: %v", length, offset, err)
+				utils.PrintLog(fmt.Sprintf("Unable to write %d zeroes at offset %d: %v", length, offset, err))
 				break
 			}
 			count += int64(written)
@@ -409,7 +403,7 @@ func (nbdserver *NBDServer) CopyChangedBlocks(ctx context.Context, changedAreas 
 		for progress := range incrementalcopyprogress {
 			copiedsize += progress
 			prog := fmt.Sprintf("Progress: %.2f%%", float64(copiedsize)/float64(totalsize)*100.0)
-			log.Println(prog)
+			utils.PrintLog(prog)
 			nbdserver.progresschan <- prog
 		}
 	}()
@@ -422,7 +416,7 @@ func (nbdserver *NBDServer) CopyChangedBlocks(ctx context.Context, changedAreas 
 			defer func() { <-semaphore }()
 			for _, block := range blocks {
 				if err := copyRange(fd, handle, block); err != nil {
-					log.Printf("Failed to copy block: %v", err)
+					utils.PrintLog(fmt.Sprintf("Failed to copy block: %v", err))
 				}
 			}
 			// check if context is cancelled

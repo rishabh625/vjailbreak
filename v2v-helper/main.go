@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -24,10 +23,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // Ensure context is canceled when we exit
 
+	utils.WriteToLogFile(fmt.Sprintf("-----	 Migration started at %s for VM %s -----", time.Now().Format(time.RFC3339), os.Getenv("SOURCE_VM_NAME")))
 	// Initialize error reporter early
 	eventReporter, err := reporter.NewReporter()
 	if err != nil {
-		log.Printf("Failed to create reporter: %v", err)
+		utils.PrintLog(fmt.Sprintf("Failed to create reporter: %v", err))
 		return
 	}
 
@@ -49,7 +49,7 @@ func main() {
 			// Wait for the reporter to process the message
 			<-ackChan
 		}
-		log.Print(msg)
+		utils.PrintLog(msg)
 		os.Exit(1)
 	}
 
@@ -80,21 +80,21 @@ func main() {
 	if err != nil {
 		handleError(fmt.Sprintf("Failed to validate vCenter connection: %v", err))
 	}
-	log.Printf("Connected to vCenter: %s\n", vCenterURL)
+	utils.PrintLog(fmt.Sprintf("Connected to vCenter: %s\n", vCenterURL))
 
 	// Validate OpenStack connection
 	openstackclients, err := openstack.NewOpenStackClients(openstackInsecure)
 	if err != nil {
 		handleError(fmt.Sprintf("Failed to validate OpenStack connection: %v", err))
 	}
-	log.Println("Connected to OpenStack")
+	utils.PrintLog("Connected to OpenStack")
 
 	// Get thumbprint
 	thumbprint, err := vcenter.GetThumbprint(vCenterURL)
 	if err != nil {
 		handleError(fmt.Sprintf("Failed to get thumbprint: %s", err))
 	}
-	log.Printf("VCenter Thumbprint: %s\n", thumbprint)
+	utils.PrintLog(fmt.Sprintf("VCenter Thumbprint: %s\n", thumbprint))
 
 	// Retrieve the source VM
 	vmops, err := vm.VMOpsBuilder(ctx, *vcclient, migrationparams.SourceVMName, client)
@@ -141,12 +141,11 @@ func main() {
 		if powerOnErr != nil {
 			msg += fmt.Sprintf("\nAlso Failed to power on VM after migration failure: %v", powerOnErr)
 		} else {
-			msg += "\nVM was powered on after migration failure"
+			msg += fmt.Sprintf("\nVM %s was powered on after migration failure", migrationparams.SourceVMName)
 		}
 
 		handleError(msg)
 	}
 
-	log.Println("Migration completed successfully")
-	return
+	utils.PrintLog(fmt.Sprintf("----- Migration completed successfully at %s for VM %s -----", time.Now().Format(time.RFC3339), migrationparams.SourceVMName))
 }

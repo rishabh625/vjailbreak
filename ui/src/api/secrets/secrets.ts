@@ -161,3 +161,11 @@ export const getSecret = async (
   }
 }
 
+export const deleteSecret = async (
+  name: string,
+  namespace = VJAILBREAK_DEFAULT_NAMESPACE
+) => {
+  const endpoint = `/api/v1/namespaces/${namespace}/secrets/${name}`
+  const response = await axios.del({ endpoint })
+  return response
+}

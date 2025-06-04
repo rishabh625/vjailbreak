@@ -6,7 +6,7 @@ import Footer from "src/components/forms/Footer";
 import { createVMwareCredsWithSecretFlow, deleteVMwareCredsWithSecretFlow } from "src/api/helpers";
 import axios from "axios";
 import { useVmwareCredentialsQuery } from "src/hooks/api/useVmwareCredentialsQuery";
-import { TextField, FormControl, InputAdornment, IconButton, FormLabel, CircularProgress } from "@mui/material";
+import { TextField, FormControl, InputAdornment, IconButton, FormLabel, CircularProgress, FormControlLabel, Switch } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import CheckIcon from "@mui/icons-material/Check";
 import { isValidName } from "src/utils";
@@ -54,6 +54,7 @@ export default function VMwareCredentialsDrawer({
             datacenter: "",
             username: "",
             password: "",
+            insecure: false,
         });
         setCreatedCredentialName(null);
         setValidatingVmwareCreds(false);
@@ -73,6 +74,7 @@ export default function VMwareCredentialsDrawer({
         datacenter: "",
         username: "",
         password: "",
+        insecure: false,
     });
 
     const isValidCredentialName = isValidName(formValues.credentialName);
@@ -91,9 +93,11 @@ export default function VMwareCredentialsDrawer({
     };
 
     const handleFormChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+        const value = field === 'insecure' ? event.target.checked : event.target.value;
+
         setFormValues(prev => ({
             ...prev,
-            [field]: event.target.value
+            [field]: value
         }));
 
         setVmwareCredsValidated(null);
@@ -172,14 +176,17 @@ export default function VMwareCredentialsDrawer({
         setValidatingVmwareCreds(true);
 
         try {
+            const credentialData = {
+                VCENTER_HOST: formValues.vcenterHost,
+                VCENTER_DATACENTER: formValues.datacenter,
+                VCENTER_USERNAME: formValues.username,
+                VCENTER_PASSWORD: formValues.password,
+                ...(formValues.insecure && { VCENTER_INSECURE: true }),
+            };
+
             const response = await createVMwareCredsWithSecretFlow(
                 formValues.credentialName,
-                {
-                    VCENTER_HOST: formValues.vcenterHost,
-                    VCENTER_DATACENTER: formValues.datacenter,
-                    VCENTER_USERNAME: formValues.username,
-                    VCENTER_PASSWORD: formValues.password,
-                }
+                credentialData
             );
 
             setCreatedCredentialName(response.metadata.name);
@@ -292,6 +299,20 @@ export default function VMwareCredentialsDrawer({
                                     </InputAdornment>
                                 ),
                             }}
+                        />
+
+                        {/* Insecure Connection Toggle */}
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={formValues.insecure}
+                                    onChange={handleFormChange('insecure')}
+                                    name="insecure"
+                                    size="small"
+                                />
+                            }
+                            label="Allow insecure connection (skip SSL verification)"
+                            sx={{ mt: 1, mb: 1 }}
                         />
 
                         {/* VMware Validation Status */}

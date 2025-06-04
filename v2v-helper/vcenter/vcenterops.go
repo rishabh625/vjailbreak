@@ -18,6 +18,7 @@ import (
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 //go:generate mockgen -source=../vcenter/vcenterops.go -destination=../vcenter/vcenterops_mock.go -package=vcenter
@@ -133,4 +134,55 @@ func (vcclient *VCenterClient) GetVMByName(ctx context.Context, name string) (*o
 		}
 	}
 	return nil, fmt.Errorf("VM not found")
+}
+
+// RenameVM renames a VM in vCenter by appending a suffix to its name
+func (vcclient *VCenterClient) RenameVM(ctx context.Context, vmName, newVMName string) error {
+	// Find the VM
+	vm, err := vcclient.GetVMByName(ctx, vmName)
+	if err != nil {
+		return fmt.Errorf("failed to find VM '%s': %v", vmName, err)
+	}
+
+	// Rename the VM
+	spec := types.VirtualMachineConfigSpec{
+		Name: newVMName,
+	}
+	task, err := vm.Reconfigure(ctx, spec)
+	if err != nil {
+		return fmt.Errorf("failed to reconfigure VM '%s' with new name '%s': %v", vmName, newVMName, err)
+	}
+	err = task.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to rename VM '%s' to '%s': %v", vmName, newVMName, err)
+	}
+
+	return nil
+}
+
+// MoveVMFolder moves a VM to a specified folder in vCenter
+func (vcclient *VCenterClient) MoveVMFolder(ctx context.Context, vmName, folderName string) error {
+	// Find the VM
+	vm, err := vcclient.GetVMByName(ctx, vmName)
+	if err != nil {
+		return fmt.Errorf("failed to find VM '%s': %v", vmName, err)
+	}
+
+	// Find the target folder
+	folderRef, err := vcclient.VCFinder.Folder(ctx, folderName)
+	if err != nil {
+		return fmt.Errorf("failed to find folder '%s': %v", folderName, err)
+	}
+
+	// Move the VM to the folder
+	task, err := folderRef.MoveInto(ctx, []types.ManagedObjectReference{vm.Reference()})
+	if err != nil {
+		return fmt.Errorf("failed to initiate move of VM '%s' to folder '%s': %v", vmName, folderName, err)
+	}
+	err = task.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to move VM '%s' to folder '%s': %v", vmName, folderName, err)
+	}
+
+	return nil
 }
