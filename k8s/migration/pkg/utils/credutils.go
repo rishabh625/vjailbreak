@@ -545,10 +545,6 @@ func GetVMwDatastore(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCre
 	return datastores, nil
 }
 
-type CustomFieldHolder struct {
-	Field []types.CustomFieldDef `xml:"field"`
-}
-
 // GetAllVMs gets all the VMs in a datacenter
 func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, datacenter string) ([]vjailbreakv1alpha1.VMInfo, error) {
 	hostStorageMap := sync.Map{}
