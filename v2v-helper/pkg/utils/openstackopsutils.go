@@ -490,7 +490,6 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 			return nil, fmt.Errorf("failed to attach volume to VM: %s", err)
 		}
 	}
-	log.Println("Attaching RDM Disks")
 
 	for _, disk := range vminfo.RDMDisks {
 		_, err := volumeattach.Create(osclient.ComputeClient, server.ID, volumeattach.CreateOpts{
