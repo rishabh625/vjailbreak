@@ -565,6 +565,7 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 	}
 	ctxlog := log.FromContext(ctx)
 	var vminfo []vjailbreakv1alpha1.VMInfo
+
 	for _, vm := range vms {
 		var vmProps mo.VirtualMachine
 		err = vm.Properties(ctx, vm.Reference(), []string{
@@ -581,6 +582,13 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 		if vmProps.Config == nil {
 			fmt.Printf("VM properties not available for vm (%s), skipping this VM", vm.Name())
 			continue
+		}
+		controllers := make(map[int32]types.BaseVirtualSCSIController)
+		// First pass: collect all SCSI controllers
+		for _, device := range vmProps.Config.Hardware.Device {
+			if scsiController, ok := device.(types.BaseVirtualSCSIController); ok {
+				controllers[device.GetVirtualDevice().Key] = scsiController
+			}
 		}
 		// Get basic RDM disk info from VM properties
 		rdmDiskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
@@ -603,12 +611,23 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			networks = append(networks, netObj.Name)
 		}
 		var rdmDisks []vjailbreakv1alpha1.RDMDiskInfo
+		skipVm := false
 		for _, device := range vmProps.Config.Hardware.Device {
 			disk, ok := device.(*types.VirtualDisk)
 			if !ok {
 				continue
 			}
-
+			if disk.ControllerKey != 0 {
+				fmt.Println("COntroller Key ", disk.ControllerKey, "Bus: ", controllers[disk.ControllerKey].GetVirtualSCSIController().SharedBus, "VM ", vm.Name())
+			}
+			if controller, ok := controllers[disk.ControllerKey]; ok {
+				if controller.GetVirtualSCSIController().SharedBus == physicalSharing {
+					ctxlog.Info("VM has SCSI controller with shared bus, migration not supported",
+						"vm", vm.Name())
+					skipVm = true // Skip this VM and move to next one
+					break
+				}
+			}
 			var dsref types.ManagedObjectReference
 			switch backing := disk.Backing.(type) {
 			case *types.VirtualDiskFlatVer2BackingInfo:
@@ -647,6 +666,9 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			datastores = AppendUnique(datastores, ds.Name)
 			disks = append(disks, disk.DeviceInfo.GetDescription().Label)
 		}
+		if skipVm {
+			continue // Skip this VM and move to the next one
+		}
 		if len(rdmDiskInfos) > 1 && len(disks) == 0 {
 			ctxlog.Info("VM has multiple RDM disks but no regular bootable disks found", "vm", vm.Name(), "hence VM cannot be migrated")
 			continue
@@ -671,6 +693,10 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 	}
 	return vminfo, nil
 }
+
+const (
+	physicalSharing = types.VirtualSCSISharingPhysicalSharing
+)
 
 // AppendUnique appends unique values to a slice
 func AppendUnique(slice []string, values ...string) []string {
@@ -856,7 +882,8 @@ func GetHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine, ho
 
 // RDM disk attributes in Vmware for migration - VJB_RDM:diskName:volumeRef:value
 // eg:
-//	 VJB_RDM:Hard Disk:volumeRef:"source-id"="abac111"
+//
+//	VJB_RDM:Hard Disk:volumeRef:"source-id"="abac111"
 //
 // PopulateRDMDiskInfoFromAttributes processes VM annotations and custom attributes to populate RDM disk information
 func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjailbreakv1alpha1.RDMDiskInfo, attributes []string) ([]vjailbreakv1alpha1.RDMDiskInfo, error) {
@@ -886,17 +913,14 @@ func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 
 		// Get or create RDMDiskInfo
 		rdmInfo, exists := rdmMap[diskName]
-		if !exists {
-			log.Info("RDM attributes exist on VM but disk not found in  RDM disks", diskName)
-		}
+		if exists && rdmInfo != nil {
+			// Initialize OpenstackVolumeRef if nil
+			if rdmInfo.OpenstackVolumeRef == nil {
+				rdmInfo.OpenstackVolumeRef = &vjailbreakv1alpha1.OpenStackVolumeRefInfo{}
+			}
 
-		// Initialize OpenstackVolumeRef if nil
-		if rdmInfo.OpenstackVolumeRef == nil {
-			rdmInfo.OpenstackVolumeRef = &vjailbreakv1alpha1.OpenStackVolumeRefInfo{}
-		}
-
-		// Update fields only if new value is provided
-		if key== "volumeRef" && value != "" {
+			// Update fields only if new value is provided
+			if key == "volumeRef" && value != "" {
 				splotVolRef := strings.Split(value, "=")
 				if len(splotVolRef) != 2 {
 					return nil, fmt.Errorf("invalid volume reference format: %s", rdmInfo.OpenstackVolumeRef.VolumeRef)
@@ -904,6 +928,9 @@ func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 				mp := make(map[string]string)
 				mp[splotVolRef[0]] = splotVolRef[1]
 				rdmInfo.OpenstackVolumeRef.VolumeRef = mp
+			}
+		} else {
+			log.Info("RDM attributes exist on VM but disk not found in  RDM disks: ", diskName)
 		}
 	}
 
@@ -927,7 +954,6 @@ func CreateServiceClient(region string, provider *gophercloud.ProviderClient) (*
 
 	return client, nil
 }
-func CreateOrUpdateLabel(ctx context.Context, client client.Client, vmwvm *vjailbreakv1alpha1.VMwareMachine, key, value string) error {
 func CreateOrUpdateLabel(ctx context.Context, client client.Client,
 	vmwvm *vjailbreakv1alpha1.VMwareMachine, key, value string) error {
 	_, err := controllerutil.CreateOrUpdate(ctx, client, vmwvm, func() error {
