@@ -20,16 +20,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type OpenStackVolumeRefInfo struct {
+	// VolumeRef is the reference to the OpenStack volume
+	VolumeRef map[string]string `json:"volumeRef,omitempty"`
+	// CinderBackendPool is the cinder backend pool of the disk
+	CinderBackendPool string `json:"cinderBackendPool,omitempty"`
+	// VolumeType is the volume type of the disk
+	VolumeType string `json:"volumeType,omitempty"`
+}
+
+type RDMDiskInfo struct {
+	// DiskName is the name of the disk
+	DiskName string `json:"diskName,omitempty"`
+	// DiskSize is the size of the disk in GB
+	DiskSize int64 `json:"diskSize,omitempty"`
+	// UUID is the unique identifier of the disk
+	UUID string `json:"uuid,omitempty"`
+	// DisplayName is the display name of the disk
+	DisplayName string `json:"displayName,omitempty"`
+	// OpenstackVolumeRef contains OpenStack volume reference information
+	OpenstackVolumeRef *OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
+}
+
 type VMInfo struct {
-	Name       string   `json:"name"`
-	Datastores []string `json:"datastores,omitempty"`
-	Disks      []string `json:"disks,omitempty"`
-	Networks   []string `json:"networks,omitempty"`
-	IPAddress  string   `json:"ipAddress,omitempty"`
-	VMState    string   `json:"vmState,omitempty"`
-	OSType     string   `json:"osType,omitempty"`
-	CPU        int      `json:"cpu,omitempty"`
-	Memory     int      `json:"memory,omitempty"`
+	Name       string        `json:"name"`
+	Datastores []string      `json:"datastores,omitempty"`
+	Disks      []string      `json:"disks,omitempty"`
+	Networks   []string      `json:"networks,omitempty"`
+	IPAddress  string        `json:"ipAddress,omitempty"`
+	VMState    string        `json:"vmState,omitempty"`
+	OSType     string        `json:"osType,omitempty"`
+	CPU        int           `json:"cpu,omitempty"`
+	Memory     int           `json:"memory,omitempty"`
+	RDMDisks   []RDMDiskInfo `json:"rdmDisks,omitempty"`
 }
 
 // VMwareMachineSpec defines the desired state of VMwareMachine
