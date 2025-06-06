@@ -617,9 +617,6 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			if !ok {
 				continue
 			}
-			if disk.ControllerKey != 0 {
-				fmt.Println("COntroller Key ", disk.ControllerKey, "Bus: ", controllers[disk.ControllerKey].GetVirtualSCSIController().SharedBus, "VM ", vm.Name())
-			}
 			if controller, ok := controllers[disk.ControllerKey]; ok {
 				if controller.GetVirtualSCSIController().SharedBus == physicalSharing {
 					ctxlog.Info("VM has SCSI controller with shared bus, migration not supported",
@@ -673,10 +670,12 @@ func GetAllVMs(ctx context.Context, vmwcreds *vjailbreakv1alpha1.VMwareCreds, da
 			ctxlog.Info("VM has multiple RDM disks but no regular bootable disks found", "vm", vm.Name(), "hence VM cannot be migrated")
 			continue
 		}
-		rdmDisks, err = PopulateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
-		if err != nil {
-			ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
-			continue
+		if len(rdmDiskInfos) > 0 {
+			rdmDisks, err = PopulateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
+			if err != nil {
+				ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
+				continue
+			}
 		}
 		vminfo = append(vminfo, vjailbreakv1alpha1.VMInfo{
 			Name:       vmProps.Config.Name,
@@ -791,6 +790,8 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 		}
 
 		if !reflect.DeepEqual(vmwvm.Spec.VMs, *vminfo) {
+			// Sync RDM disks before updating VM info
+			syncRDMDisks(vminfo, vmwvm)
 			// update vminfo in case the VM has been moved by vMotion
 			vmwvm.Spec.VMs = *vminfo
 
@@ -827,6 +828,29 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 		return fmt.Errorf("failed to update VMwareMachine status: %w", err)
 	}
 	return nil
+}
+
+// syncRDMDisks handles synchronization of RDM disk information between VMInfo and VMwareMachine
+func syncRDMDisks(vminfo *vjailbreakv1alpha1.VMInfo, vmwvm *vjailbreakv1alpha1.VMwareMachine) {
+	// Case 1: VMInfo has no RDM disks but VMwareMachine does
+	if vminfo.RDMDisks == nil && vmwvm.Spec.VMs.RDMDisks != nil {
+		vminfo.RDMDisks = vmwvm.Spec.VMs.RDMDisks
+		return
+	}
+
+	// Case 2: Both have RDM disks - preserve OpenStack volume references
+	if vminfo.RDMDisks != nil && vmwvm.Spec.VMs.RDMDisks != nil {
+		for i := range vminfo.RDMDisks {
+			if i >= len(vmwvm.Spec.VMs.RDMDisks) {
+				break
+			}
+			// Preserve existing OpenStack volume reference if new one is nil
+			if vminfo.RDMDisks[i].OpenstackVolumeRef == nil &&
+				vmwvm.Spec.VMs.RDMDisks[i].OpenstackVolumeRef != nil {
+				vminfo.RDMDisks[i].OpenstackVolumeRef = vmwvm.Spec.VMs.RDMDisks[i].OpenstackVolumeRef
+			}
+		}
+	}
 }
 
 func GetClosestFlavour(cpu, memory int, computeClient *gophercloud.ServiceClient) (*flavors.Flavor, error) {
@@ -930,10 +954,9 @@ func PopulateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 				rdmInfo.OpenstackVolumeRef.VolumeRef = mp
 			}
 		} else {
-			log.Info("RDM attributes exist on VM but disk not found in  RDM disks: ", diskName)
+			log.Info("RDM attributes exist on VM but disk not found in  RDM disks")
 		}
 	}
-
 	// Convert map back to slice while preserving all data
 	rdmDisks := make([]vjailbreakv1alpha1.RDMDiskInfo, 0, len(rdmMap))
 	for _, rdmInfo := range rdmMap {
