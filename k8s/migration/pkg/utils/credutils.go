@@ -838,16 +838,34 @@ func syncRDMDisks(vminfo *vjailbreakv1alpha1.VMInfo, vmwvm *vjailbreakv1alpha1.V
 		return
 	}
 
-	// Case 2: Both have RDM disks - preserve OpenStack volume references
+	// Case 2: Both have RDM disks - preserve OpenStack related information
 	if vminfo.RDMDisks != nil && vmwvm.Spec.VMs.RDMDisks != nil {
-		for i := range vminfo.RDMDisks {
-			if i >= len(vmwvm.Spec.VMs.RDMDisks) {
-				break
-			}
-			// Preserve existing OpenStack volume reference if new one is nil
-			if vminfo.RDMDisks[i].OpenstackVolumeRef == nil &&
-				vmwvm.Spec.VMs.RDMDisks[i].OpenstackVolumeRef != nil {
-				vminfo.RDMDisks[i].OpenstackVolumeRef = vmwvm.Spec.VMs.RDMDisks[i].OpenstackVolumeRef
+		// Create a map of existing VMware Machine RDM disks by disk name
+		existingDisks := make(map[string]vjailbreakv1alpha1.RDMDiskInfo)
+		for _, disk := range vmwvm.Spec.VMs.RDMDisks {
+			existingDisks[disk.DiskName] = disk
+		}
+
+		// Update VMInfo RDM disks while preserving OpenStack information
+		for i, disk := range vminfo.RDMDisks {
+			if existingDisk, exists := existingDisks[disk.DiskName]; exists {
+				// Preserve OpenStack volume reference if new one is nil
+				if vminfo.RDMDisks[i].OpenstackVolumeRef == nil &&
+					existingDisk.OpenstackVolumeRef != nil {
+					vminfo.RDMDisks[i].OpenstackVolumeRef = existingDisk.OpenstackVolumeRef
+				}
+
+				// Preserve CinderBackendPool if new one is nil
+				if vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool == "" &&
+					existingDisk.OpenstackVolumeRef.CinderBackendPool != "" {
+					vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool = existingDisk.OpenstackVolumeRef.CinderBackendPool
+				}
+
+				// Preserve VolumeType if new one is nil
+				if vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType == "" &&
+					existingDisk.OpenstackVolumeRef.VolumeType != "" {
+					vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType = existingDisk.OpenstackVolumeRef.VolumeType
+				}
 			}
 		}
 	}
