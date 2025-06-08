@@ -91,6 +91,8 @@ func (r *VMwareCredsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *VMwareCredsReconciler) reconcileNormal(ctx context.Context, scope *scope.VMwareCredsScope) (ctrl.Result, error) {
+	ctxlog := log.FromContext(ctx)
+	ctxlog.Info(fmt.Sprintf("Reconciling VMwareCreds '%s' object", scope.Name()))
 	if _, err := utils.ValidateVMwareCreds(scope.VMwareCreds); err != nil {
 		// Update the status of the VMwareCreds object
 		scope.VMwareCreds.Status.VMwareValidationStatus = string(corev1.PodFailed)
@@ -102,6 +104,7 @@ func (r *VMwareCredsReconciler) reconcileNormal(ctx context.Context, scope *scop
 		}
 		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error validating VMwareCreds '%s'", scope.Name()))
 	}
+	ctxlog.Info(fmt.Sprintf("Successfully authenticated to VMware '%s'", scope.Name()))
 	// Update the status of the VMwareCreds object
 	scope.VMwareCreds.Status.VMwareValidationStatus = string(corev1.PodSucceeded)
 	scope.VMwareCreds.Status.VMwareValidationMessage = "Successfully authenticated to VMware"
@@ -128,6 +131,8 @@ func (r *VMwareCredsReconciler) reconcileNormal(ctx context.Context, scope *scop
 
 // nolint:unparam
 func (r *VMwareCredsReconciler) reconcileDelete(ctx context.Context, scope *scope.VMwareCredsScope) (ctrl.Result, error) {
+	ctxlog := log.FromContext(ctx)
+	ctxlog.Info(fmt.Sprintf("Reconciling deletion of VMwareCreds '%s' object", scope.Name()))
 	// Delete the associated secret
 	err := r.Client.Delete(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
