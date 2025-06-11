@@ -598,6 +598,8 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			fmt.Printf("VM properties not available for vm (%s), skipping this VM", vm.Name())
 			continue
 		}
+		// Fetch details required for RDM disks
+		hostStorageMap := sync.Map{}
 		controllers := make(map[int32]govmitypes.BaseVirtualSCSIController)
 		// First pass: collect all SCSI controllers
 		for _, device := range vmProps.Config.Hardware.Device {
