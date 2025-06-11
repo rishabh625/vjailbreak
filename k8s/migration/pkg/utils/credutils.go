@@ -620,7 +620,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			}
 			networks = append(networks, netObj.Name)
 		}
-		var skipVm bool
+		var skipVM bool
 		for _, device := range vmProps.Config.Hardware.Device {
 			disk, ok := device.(*govmitypes.VirtualDisk)
 			if !ok {
@@ -630,7 +630,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 				if controller.GetVirtualSCSIController().SharedBus == govmitypes.VirtualSCSISharingPhysicalSharing {
 					ctxlog.Info("VM has SCSI controller with shared bus, migration not supported",
 						"vm", vm.Name())
-					skipVm = true // Skip this VM and move to next one
+					skipVM = true // Skip this VM and move to next one
 					break
 				}
 			}
@@ -713,7 +713,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 		} else {
 			clusterName = ""
 		}
-		if skipVm {
+		if skipVM {
 			continue
 		}
 		if len(rdmDiskInfos) >= 1 && len(disks) == 0 {
@@ -1188,7 +1188,7 @@ func getHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine, ho
 	var hostStorageDevice *govmitypes.HostStorageDeviceInfo
 	hostStorageDevicefromMap, ok := hostStorageMap.Load(hostSystem.String())
 	if ok {
-		hostStorageDevice, ok = hostStorageDevicefromMap.(*govmitypes.HostStorageDeviceInfo)
+		hs, ok = hsfromMap.(mo.HostSystem)
 		if !ok {
 			return nil, fmt.Errorf("invalid type assertion for host system from map")
 		}
