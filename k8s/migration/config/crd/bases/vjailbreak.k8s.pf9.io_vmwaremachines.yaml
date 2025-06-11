@@ -97,6 +97,8 @@ spec:
                     description: RDMDisks is the list of RDM disks for the virtual
                       machine
                     items:
+                      description: RDMDiskInfo contains information about a Raw Device
+                        Mapping (RDM) disk
                       properties:
                         diskName:
                           description: DiskName is the name of the disk
