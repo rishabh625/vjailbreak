@@ -632,7 +632,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 				continue
 			}
 			if controller, ok := controllers[disk.ControllerKey]; ok {
-				if controller.GetVirtualSCSIController().SharedBus == physicalSharing {
+				if controller.GetVirtualSCSIController().SharedBus == govmitypes.VirtualSCSISharingPhysicalSharing {
 					ctxlog.Info("VM has SCSI controller with shared bus, migration not supported",
 						"vm", vm.Name())
 					skipVm = true // Skip this VM and move to next one
@@ -653,7 +653,6 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 						DiskSize: disk.CapacityInBytes,
 					}
 					for _, scsiDisk := range hostStorageInfo.ScsiLun {
-
 						lunDetails := scsiDisk.GetScsiLun()
 						if backing.LunUuid == lunDetails.Uuid {
 							info.DisplayName = lunDetails.DisplayName
@@ -720,14 +719,14 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			clusterName = ""
 		}
 		if skipVm {
-			continue // Skip this VM and move to the next one
+			continue
 		}
 		if len(rdmDiskInfos) > 1 && len(disks) == 0 {
 			ctxlog.Info("VM has multiple RDM disks but no regular bootable disks found", "vm", vm.Name(), "hence VM cannot be migrated")
 			continue
 		}
 		if len(rdmDiskInfos) > 0 {
-			rdmDisks, err = populateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
+			rdmDiskInfos, err = PopulateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
 			if err != nil {
 				ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
 				continue
