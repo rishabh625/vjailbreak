@@ -98,6 +98,8 @@ type VMwareMachineList struct {
 	Items           []VMwareMachine `json:"items"`
 }
 
+// OpenStackVolumeRefInfo contains information about the OpenStack volume reference in migrating rdm disks
+// This struct is used to store the reference to the OpenStack volume and its associated metadata
 type OpenStackVolumeRefInfo struct {
 	// VolumeRef is the reference to the OpenStack volume
 	VolumeRef map[string]string `json:"volumeRef,omitempty"`
@@ -107,6 +109,7 @@ type OpenStackVolumeRefInfo struct {
 	VolumeType string `json:"volumeType,omitempty"`
 }
 
+// RDMDiskInfo contains information about a Raw Device Mapping (RDM) disk
 type RDMDiskInfo struct {
 	// DiskName is the name of the disk
 	DiskName string `json:"diskName,omitempty"`
