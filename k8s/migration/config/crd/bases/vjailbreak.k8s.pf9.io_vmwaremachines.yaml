@@ -127,7 +127,8 @@ spec:
                               type: string
                           type: object
                         uuid:
-                          description: UUID is the unique identifier of the disk
+                          description: UUID (VML id) is the unique identifier of the
+                            disk
                           type: string
                       type: object
                     type: array

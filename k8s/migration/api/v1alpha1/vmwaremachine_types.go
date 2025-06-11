@@ -112,7 +112,7 @@ type RDMDiskInfo struct {
 	DiskName string `json:"diskName,omitempty"`
 	// DiskSize is the size of the disk in GB
 	DiskSize int64 `json:"diskSize,omitempty"`
-	// UUID is the unique identifier of the disk
+	// UUID (VML id) is the unique identifier of the disk
 	UUID string `json:"uuid,omitempty"`
 	// DisplayName is the display name of the disk
 	DisplayName string `json:"displayName,omitempty"`

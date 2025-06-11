@@ -20,6 +20,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/pkg/errors"
+	"github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -606,7 +607,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 		}
 		// Get basic RDM disk info from VM properties
 		rdmDiskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
-		hostStorageInfo, err := GetHostStorageDeviceInfo(ctx, vm, &hostStorageMap)
+		hostStorageInfo, err := getHostStorageDeviceInfo(ctx, vm, &hostStorageMap)
 		if err != nil {
 			ctxlog.Error(err, "failed to get disk info for vm skipping vm", "vm", vm.Name(), err)
 			continue
@@ -724,7 +725,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			continue
 		}
 		if len(rdmDiskInfos) > 0 {
-			rdmDisks, err = PopulateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
+			rdmDisks, err = populateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
 			if err != nil {
 				ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
 				continue
@@ -1226,8 +1227,7 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 	}
 	// Process attributes for additional RDM information
 	for _, attr := range attributes {
-		if strings.Contains(attr, "VJB_RDM:") {
-			fmt.Println("Processing RDM attribute:", attr)
+		if strings.HasPrefix(attr, "VJB_RDM:") {
 			parts := strings.Split(attr, ":")
 			if len(parts) != 4 {
 				continue
