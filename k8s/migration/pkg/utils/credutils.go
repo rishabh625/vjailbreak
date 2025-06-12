@@ -1130,19 +1130,18 @@ func syncRDMDisks(vminfo *vjailbreakv1alpha1.VMInfo, vmwvm *vjailbreakv1alpha1.V
 				if vminfo.RDMDisks[i].OpenstackVolumeRef == nil &&
 					existingDisk.OpenstackVolumeRef != nil {
 					vminfo.RDMDisks[i].OpenstackVolumeRef = existingDisk.OpenstackVolumeRef
-					return
-				}
+				} else {
+					// Preserve CinderBackendPool if new one is nil
+					if vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool == "" &&
+						existingDisk.OpenstackVolumeRef.CinderBackendPool != "" {
+						vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool = existingDisk.OpenstackVolumeRef.CinderBackendPool
+					}
 
-				// Preserve CinderBackendPool if new one is nil
-				if vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool == "" &&
-					existingDisk.OpenstackVolumeRef.CinderBackendPool != "" {
-					vminfo.RDMDisks[i].OpenstackVolumeRef.CinderBackendPool = existingDisk.OpenstackVolumeRef.CinderBackendPool
-				}
-
-				// Preserve VolumeType if new one is nil
-				if vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType == "" &&
-					existingDisk.OpenstackVolumeRef.VolumeType != "" {
-					vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType = existingDisk.OpenstackVolumeRef.VolumeType
+					// Preserve VolumeType if new one is nil
+					if vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType == "" &&
+						existingDisk.OpenstackVolumeRef.VolumeType != "" {
+						vminfo.RDMDisks[i].OpenstackVolumeRef.VolumeType = existingDisk.OpenstackVolumeRef.VolumeType
+					}
 				}
 			}
 		}
