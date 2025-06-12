@@ -5,17 +5,18 @@ package vm
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/canonical/gomaasclient/client"
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -466,19 +467,25 @@ func (vmops *VMOps) VMPowerOn() error {
 	return nil
 }
 
+// GetVMwareMachine retrieves a VMwareMachine object from the Kubernetes cluster based on the VM name.
 func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) (*vjailbreakv1alpha1.VMwareMachine, error) {
+	if client == nil || ctx == nil || vmName == "" {
+		return nil, fmt.Errorf("invalid parameters: client, context, and vmName must not be nil or empty")
+	}
 	// Convert VM name to k8s compatible name
-	sanitizedVMName := ConvertToK8sName(vmName)
-
-	// Create VMwareMachine object
-	vmwareMachine := &vjailbreakv1alpha1.VMwareMachine{}
+	sanitizedVMName, err := utils.ConvertToK8sName(vmName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert VM name to k8s name: %w", err)
+	}
 
 	// Create namespaced name for lookup
 	namespacedName := k8stypes.NamespacedName{
-		Name:      sanitizedVMName,    // Use the sanitized VM name
-		Namespace: "migration-system", // Specify the namespace
+		Name:      sanitizedVMName,                    // Use the sanitized VM name
+		Namespace: constants.MigrationSystemNamespace, // Specify the namespace
 	}
 
+	// Create VMwareMachine object
+	vmwareMachine := &vjailbreakv1alpha1.VMwareMachine{}
 	// Get VMwareMachine object
 	if err := client.Get(ctx, namespacedName, vmwareMachine); err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -490,21 +497,21 @@ func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) 
 	return vmwareMachine, nil
 }
 
-func ConvertToK8sName(name string) string {
-	// Replace invalid characters with dashes
-	name = strings.ToLower(name)
-	name = strings.ReplaceAll(name, "_", "-")
-	name = strings.ReplaceAll(name, " ", "-")
-
-	// Remove any other invalid characters
-	validChar := regexp.MustCompile(`[^a-z0-9-]`)
-	name = validChar.ReplaceAllString(name, "")
-
-	return name
-}
-
 func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine) {
-	if rdmDiskInfo != nil && rdmDiskInfo.Spec.VMs.RDMDisks != nil {
+	// Check if vminfo is nil
+	if vminfo == nil || rdmDiskInfo == nil {
+		fmt.Printf("vminfo or rdm disk info is is nil")
+		return
+	}
+	if rdmDiskInfo.Spec == nil {
+		fmt.Printf("rdm disk info spec is nil")
+		return
+	}
+	if rdmDiskInfo.Spec.VMs == nil {
+		fmt.Printf("rdm disk info spec is nil")
+		return
+	}
+	if rdmDiskInfo.Spec.VMs.RDMDisks != nil {
 		vminfo.RDMDisks = make([]RDMDisk, len(rdmDiskInfo.Spec.VMs.RDMDisks))
 		for i, disk := range rdmDiskInfo.Spec.VMs.RDMDisks {
 			vminfo.RDMDisks[i] = RDMDisk{

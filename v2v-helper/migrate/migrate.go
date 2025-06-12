@@ -94,7 +94,7 @@ func (migobj *Migrate) CreateVolumes(vminfo vm.VMInfo) (vm.VMInfo, error) {
 func (migobj *Migrate) AttachVolume(disk vm.VMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
 	migobj.logMessage("Attaching volumes to VM")
-	volumeID, err := GetVolumeID(disk)
+	volumeID, err := getVolumeID(disk)
 	if err != nil {
 		return "", fmt.Errorf("failed to get volume ID: %s", err)
 	}
@@ -830,7 +830,7 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 	}
 	// Import LUN and MigrateRDM disk
 	for idx, rdmDisk := range vminfo.RDMDisks {
-		volumeID, err := migobj.CinderManage(rdmDisk)
+		volumeID, err := migobj.cinderManage(rdmDisk)
 		if err != nil {
 			migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
 			return errors.Wrap(err, "failed to import LUN")
@@ -877,10 +877,18 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 	return nil
 }
 
-func GetVolumeID(d interface{}) (string, error) {
+// getVolumeID retrieves the volume ID from the disk object, by type asserting passed object.
+func getVolumeID(d interface{}) (string, error) {
+	if d == nil {
+		return "", fmt.Errorf("disk is nil")
+	}
 	switch d.(type) {
 	case vm.VMDisk:
-		return d.(vm.VMDisk).OpenstackVol.ID, nil
+		disk := d.(vm.VMDisk)
+		if disk.OpenstackVol == nil {
+			return "", fmt.Errorf("OpenStack volume is nil")
+		}
+		return disk.OpenstackVol.ID, nil
 	case string:
 		return d.(string), nil
 	default:
@@ -888,20 +896,22 @@ func GetVolumeID(d interface{}) (string, error) {
 	}
 }
 
-func (migobj *Migrate) CinderManage(rdmDisk vm.RDMDisk) (string, error) {
+// cinderManage imports a LUN into OpenStack Cinder and returns the volume ID.
+func (migobj *Migrate) cinderManage(rdmDisk vm.RDMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
+	migobj.logMessage(fmt.Sprintf("Importing LUN: %s", rdmDisk.DiskName))
 	volume, err := openstackops.CinderManage(rdmDisk)
 	if err != nil || volume == nil {
 		return "", fmt.Errorf("failed to import LUN: %s", err)
+	} else if volume.ID == "" {
+		return "", fmt.Errorf("failed to import LUN: received empty volume ID")
 	}
-	if volume.ID == "" {
-		return "", fmt.Errorf("failed to import LUN: %s", err)
-	}
+	migobj.logMessage(fmt.Sprintf("LUN imported successfully, waiting for volume %s to become available", volume.ID))
 	// Wait for the volume to become available
 	err = openstackops.WaitForVolume(volume.ID)
 	if err != nil {
 		return "", fmt.Errorf("failed to wait for volume to become available: %s", err)
 	}
+	migobj.logMessage(fmt.Sprintf("Volume %s is now available", volume.ID))
 	return volume.ID, nil
 }
-  1 change: 0 additions & 1 de

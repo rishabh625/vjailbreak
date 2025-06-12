@@ -31,7 +31,7 @@ func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
 	return payload, nil
 }
 
-// Manage triggers the volume manage request.
+// CinderManage Manage triggers the volume manage request and returns volume.
 func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error) {
 	body, err := ToVolumeManageMap(rdmDisk)
 	if err != nil {
