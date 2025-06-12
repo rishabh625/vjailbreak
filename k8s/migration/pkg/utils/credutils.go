@@ -628,7 +628,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			}
 			if controller, ok := controllers[disk.ControllerKey]; ok {
 				if controller.GetVirtualSCSIController().SharedBus == govmitypes.VirtualSCSISharingPhysicalSharing {
-					ctxlog.Info("VM has SCSI controller with shared bus, migration not supported",
+					ctxlog.Info("SKipping VM: VM has SCSI controller with shared bus, migration not supported",
 						"vm", vm.Name())
 					skipVM = true // Skip this VM and move to next one
 					break
@@ -717,12 +717,11 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			continue
 		}
 		if len(rdmDiskInfos) >= 1 && len(disks) == 0 {
-			ctxlog.Info("VM has multiple RDM disks but no regular bootable disks found", "vm", vm.Name(), "hence VM cannot be migrated")
+			ctxlog.Info("Skipping VM: VM has RDM disks but no regular bootable disks found, migration not supported", "vm", vm.Name())
 			continue
 		}
-		var rdmDisks []vjailbreakv1alpha1.RDMDiskInfo
 		if len(rdmDiskInfos) > 0 {
-			rdmDisks, err = populateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
+			rdmDiskInfos, err = populateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
 			if err != nil {
 				ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
 				continue
@@ -740,7 +739,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			Memory:      int(vmProps.Config.Hardware.MemoryMB),
 			ESXiName:    host.Name,
 			ClusterName: clusterName,
-			RDMDisks:    rdmDisks,
+			RDMDisks:    rdmDiskInfos,
 		})
 	}
 	return vminfo, nil
@@ -1188,7 +1187,7 @@ func getHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine, ho
 	var hostStorageDevice *govmitypes.HostStorageDeviceInfo
 	hostStorageDevicefromMap, ok := hostStorageMap.Load(hostSystem.String())
 	if ok {
-		hs, ok = hsfromMap.(mo.HostSystem)
+		hostStorageDevice, ok = hostStorageDevicefromMap.(*govmitypes.HostStorageDeviceInfo)
 		if !ok {
 			return nil, fmt.Errorf("invalid type assertion for host system from map")
 		}
