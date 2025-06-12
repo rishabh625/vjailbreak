@@ -882,15 +882,15 @@ func getVolumeID(d interface{}) (string, error) {
 	if d == nil {
 		return "", fmt.Errorf("disk is nil")
 	}
-	switch d.(type) {
+
+	switch disk := d.(type) {
 	case vm.VMDisk:
-		disk := d.(vm.VMDisk)
 		if disk.OpenstackVol == nil {
 			return "", fmt.Errorf("OpenStack volume is nil")
 		}
 		return disk.OpenstackVol.ID, nil
 	case string:
-		return d.(string), nil
+		return disk, nil
 	default:
 		return "", fmt.Errorf("unsupported type: %T", d)
 	}

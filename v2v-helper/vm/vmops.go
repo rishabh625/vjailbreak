@@ -5,17 +5,19 @@ package vm
 import (
 	"context"
 	"fmt"
+	reflect "reflect"
 	"strings"
 	"time"
 
-	"github.com/canonical/gomaasclient/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	k8utils "github.com/platform9/vjailbreak/k8s/migration/pkg/utils"
+	"github.com/platform9/vjailbreak/common"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -77,7 +79,7 @@ type VMOps struct {
 	vcclient  *vcenter.VCenterClient
 	VMObj     *object.VirtualMachine
 	ctx       context.Context
-	k8sClient client.Client
+	k8sClient k8sclient.Client
 }
 
 type RDMDisk struct {
@@ -103,7 +105,7 @@ type RDMDisk struct {
 	VolumeRef map[string]string `json:"volumeRef,omitempty"`
 }
 
-func VMOpsBuilder(ctx context.Context, vcclient vcenter.VCenterClient, name string, k8sClient client.Client) (*VMOps, error) {
+func VMOpsBuilder(ctx context.Context, vcclient vcenter.VCenterClient, name string, k8sClient k8sclient.Client) (*VMOps, error) {
 	vm, err := vcclient.GetVMByName(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get VM: %s", err)
@@ -207,7 +209,6 @@ func parseChangeID(changeId string) (*ChangeID, error) {
 
 func getChangeID(disk *types.VirtualDisk) (*ChangeID, error) {
 	var changeId string
-
 	if b, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
 		changeId = b.ChangeId
 	} else if b, ok := disk.Backing.(*types.VirtualDiskSparseVer2BackingInfo); ok {
@@ -468,12 +469,12 @@ func (vmops *VMOps) VMPowerOn() error {
 }
 
 // GetVMwareMachine retrieves a VMwareMachine object from the Kubernetes cluster based on the VM name.
-func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) (*vjailbreakv1alpha1.VMwareMachine, error) {
+func GetVMwareMachine(ctx context.Context, client k8sclient.Client, vmName string) (*vjailbreakv1alpha1.VMwareMachine, error) {
 	if client == nil || ctx == nil || vmName == "" {
 		return nil, fmt.Errorf("invalid parameters: client, context, and vmName must not be nil or empty")
 	}
 	// Convert VM name to k8s compatible name
-	sanitizedVMName, err := k8utils.ConvertToK8sName(vmName)
+	sanitizedVMName, err := common.ConvertToK8sName(vmName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert VM name to k8s name: %w", err)
 	}
@@ -503,17 +504,17 @@ func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine)
 		fmt.Printf("vminfo or rdm disk info is is nil")
 		return
 	}
-	if rdmDiskInfo.Spec == nil {
+	if reflect.DeepEqual(rdmDiskInfo.Spec, vjailbreakv1alpha1.VMwareMachineSpec{}) {
 		fmt.Printf("rdm disk info spec is nil")
 		return
 	}
-	if rdmDiskInfo.Spec.VMs == nil {
+	if reflect.DeepEqual(rdmDiskInfo.Spec.VMInfo, vjailbreakv1alpha1.VMInfo{}) {
 		fmt.Printf("rdm disk info spec is nil")
 		return
 	}
-	if rdmDiskInfo.Spec.VMs.RDMDisks != nil {
-		vminfo.RDMDisks = make([]RDMDisk, len(rdmDiskInfo.Spec.VMs.RDMDisks))
-		for i, disk := range rdmDiskInfo.Spec.VMs.RDMDisks {
+	if rdmDiskInfo.Spec.VMInfo.RDMDisks != nil {
+		vminfo.RDMDisks = make([]RDMDisk, len(rdmDiskInfo.Spec.VMInfo.RDMDisks))
+		for i, disk := range rdmDiskInfo.Spec.VMInfo.RDMDisks {
 			vminfo.RDMDisks[i] = RDMDisk{
 				DiskName:          disk.DiskName,
 				DiskSize:          disk.DiskSize,

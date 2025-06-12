@@ -5,26 +5,25 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 )
 
 // ToVolumeManageMap builds the request payload for manage volume.
 func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
-	   // Validate required fields
+	// Validate required fields
 	if rdmDisk.DiskName == "" {
-        return nil, fmt.Errorf("disk name cannot be empty")
-    }
-    if rdmDisk.CinderBackendPool == "" {
-        return nil, fmt.Errorf("cinder backend pool cannot be empty")
-    }
-    if rdmDisk.VolumeType == "" {
-        return nil, fmt.Errorf("volume type cannot be empty")
-    }
-    if len(rdmDisk.VolumeRef) == 0 {
-        return nil, fmt.Errorf("volume reference cannot be empty")
-    }
+		return nil, fmt.Errorf("disk name cannot be empty")
+	}
+	if rdmDisk.CinderBackendPool == "" {
+		return nil, fmt.Errorf("cinder backend pool cannot be empty")
+	}
+	if rdmDisk.VolumeType == "" {
+		return nil, fmt.Errorf("volume type cannot be empty")
+	}
 	if len(rdmDisk.VolumeRef) == 0 {
+		return nil, fmt.Errorf("volume reference cannot be empty")
+	}
+
 	var key, value string
 	for k, rm := range rdmDisk.VolumeRef {
 		key = k
@@ -48,7 +47,7 @@ func ToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
 
 // CinderManage Manage triggers the volume manage request and returns volume.
 func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error) {
-	
+
 	body, err := ToVolumeManageMap(rdmDisk)
 	if err != nil {
 		return nil, err
@@ -57,7 +56,7 @@ func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Vol
 	var result map[string]interface{}
 
 	response, err := osclient.BlockStorageClient.Post(osclient.BlockStorageClient.ServiceURL("manageable_volumes"), body, &result, &gophercloud.RequestOpts{
-		OkCodes:     []int{constants.AcceptedHTTPStatusCodes},
+		OkCodes:     []int{202},
 		MoreHeaders: map[string]string{"OpenStack-API-Version": "volume 3.8"},
 	})
 	if err != nil {
