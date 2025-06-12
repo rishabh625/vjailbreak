@@ -10,12 +10,12 @@ import (
 
 	"github.com/canonical/gomaasclient/client"
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	k8utils "github.com/platform9/vjailbreak/k8s/migration/pkg/utils"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -473,7 +473,7 @@ func GetVMwareMachine(ctx context.Context, client client.Client, vmName string) 
 		return nil, fmt.Errorf("invalid parameters: client, context, and vmName must not be nil or empty")
 	}
 	// Convert VM name to k8s compatible name
-	sanitizedVMName, err := utils.ConvertToK8sName(vmName)
+	sanitizedVMName, err := k8utils.ConvertToK8sName(vmName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert VM name to k8s name: %w", err)
 	}

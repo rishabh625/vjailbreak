@@ -41,4 +41,6 @@ systemctl enable --now serial-getty@ttyS0.service`
 	EventMessageMigrationFailed                   = "Trying to perform cleanup"
 	EventMessageCopyingDisk                       = "Copying disk"
 	EventMessageFailed                            = "Failed to"
+
+	AcceptedHTTPStatusCodes = 202
 )
