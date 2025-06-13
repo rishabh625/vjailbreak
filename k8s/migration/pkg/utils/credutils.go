@@ -607,7 +607,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 		rdmDiskInfos := make([]vjailbreakv1alpha1.RDMDiskInfo, 0)
 		hostStorageInfo, err := getHostStorageDeviceInfo(ctx, vm, &hostStorageMap)
 		if err != nil {
-			ctxlog.Error(err, "failed to get disk info for vm skipping vm", "vm", vm.Name(), err)
+			ctxlog.Error(err, "failed to get disk info for vm skipping vm", "vm", vm.Name())
 			continue
 		}
 		attributes := strings.Split(vmProps.Summary.Config.Annotation, "\n")
