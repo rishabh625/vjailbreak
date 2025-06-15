@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
@@ -67,11 +68,18 @@ func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Vol
 		defer response.Body.Close()
 	}
 
-	volume, _ := result["volume"].(map[string]interface{})
+	volumeMap := result["volume"].(map[string]interface{})
 
-	id := volume["id"]
-	v := volumes.Volume{
-		ID: id.(string),
+	// Convert volume map to JSON
+	volumeJSON, err := json.Marshal(volumeMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal JSON into your struct
+	var v volumes.Volume
+	if err := json.Unmarshal(volumeJSON, &v); err != nil {
+		return nil, err
 	}
 	return &v, nil
 }
