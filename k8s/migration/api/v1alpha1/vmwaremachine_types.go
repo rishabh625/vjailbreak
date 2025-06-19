@@ -120,7 +120,7 @@ type RDMDiskInfo struct {
 	// DisplayName is the display name of the disk
 	DisplayName string `json:"displayName,omitempty"`
 	// OpenstackVolumeRef contains OpenStack volume reference information
-	OpenstackVolumeRef *OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
+	OpenstackVolumeRef OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
 }
 
 func init() {

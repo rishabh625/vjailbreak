@@ -721,6 +721,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 			continue
 		}
 		if len(rdmDiskInfos) > 0 {
+			fmt.Println("VM : ", vm.Name(), " has RDM disks, populating RDM disk info from attributes", attributes)
 			rdmDiskInfos, err = populateRDMDiskInfoFromAttributes(ctx, rdmDiskInfos, attributes)
 			if err != nil {
 				ctxlog.Error(err, "failed to populate RDM disk info from attributes for vm", "vm", vm.Name)
@@ -1209,7 +1210,7 @@ func getHostStorageDeviceInfo(ctx context.Context, vm *object.VirtualMachine, ho
 //
 //	VJB_RDM:Hard Disk:volumeRef:"source-id"="abac111"
 func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjailbreakv1alpha1.RDMDiskInfo, attributes []string) ([]vjailbreakv1alpha1.RDMDiskInfo, error) {
-	rdmMap := make(map[string]*vjailbreakv1alpha1.RDMDiskInfo)
+	rdmMap := make(map[string]vjailbreakv1alpha1.RDMDiskInfo)
 	log := ctrllog.FromContext(ctx)
 
 	// Create copies of base RDM disks to preserve existing data
@@ -1219,7 +1220,8 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 	}
 	// Process attributes for additional RDM information
 	for _, attr := range attributes {
-		if strings.HasPrefix(attr, "VJB_RDM:") {
+		if strings.Contains(attr, "VJB_RDM:") {
+			fmt.Println("Processing RDM attribute:", attr)
 			parts := strings.Split(attr, ":")
 			if len(parts) != 4 {
 				continue
