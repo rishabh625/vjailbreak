@@ -110,7 +110,7 @@ func VMOpsBuilder(ctx context.Context, vcclient vcenter.VCenterClient, name stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get VM: %s", err)
 	}
-	return &VMOps{vcclient: &vcclient, VMObj: vm, ctx: ctx}, nil
+	return &VMOps{vcclient: &vcclient, VMObj: vm, ctx: ctx, k8sClient: k8sClient}, nil
 
 }
 
