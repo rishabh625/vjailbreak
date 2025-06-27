@@ -1,4 +1,4 @@
-module github.com/platform9/vjailbreak/common
+module github.com/rishabh625/vjailbreak/common
 
 go 1.24.0
 
