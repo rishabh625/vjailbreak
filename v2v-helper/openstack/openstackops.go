@@ -45,6 +45,7 @@ type OpenstackOperations interface {
 	DeleteVolume(volumeID string) error
 	FindDevice(volumeID string) (string, error)
 	WaitUntilVMActive(vmID string) (bool, error)
+	CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error)
 }
 
 func getCert(endpoint string) (*x509.Certificate, error) {
