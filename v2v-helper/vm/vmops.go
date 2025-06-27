@@ -5,28 +5,21 @@ package vm
 import (
 	"context"
 	"fmt"
-<<<<<<< HEAD
+	"log"
 	reflect "reflect"
 	"strings"
 	"time"
 
+	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
-=======
-	"log"
-	"strings"
-	"time"
-
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
->>>>>>> 6eaa83d68f443715a8071388f0d7cc95e79ffb62
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/platform9/vjailbreak/common"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -273,9 +266,9 @@ func (vmops *VMOps) UpdateDisksInfo(vminfo *VMInfo) error {
 		// Based on VMName and diskname fetch DiskInfo
 		rdmDIskInfo, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name)
 		if err != nil {
-			return vminfo, fmt.Errorf("failed to get rdmDisk properties: %s", err)
+			return fmt.Errorf("failed to get rdmDisk properties: %s", err)
 		}
-		copyRDMDisks(&vminfo, rdmDIskInfo)
+		copyRDMDisks(vminfo, rdmDIskInfo)
 	}
 
 	return nil
@@ -609,6 +602,7 @@ func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine)
 			}
 		}
 	}
+}
 func (vmops *VMOps) ListSnapshots() ([]types.VirtualMachineSnapshotTree, error) {
 	vm := vmops.VMObj
 	var o mo.VirtualMachine
