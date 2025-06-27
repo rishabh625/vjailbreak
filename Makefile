@@ -56,8 +56,9 @@ vjail-controller-only:
 generate-manifests: vjail-controller ui
 	rm -rf image_builder/deploy && mkdir image_builder/deploy
 	envsubst < ui/deploy/ui.yaml > image_builder/deploy/01ui.yaml
+	envsubst < image_builder/configs/version-config.yaml > image_builder/deploy/version-config.yaml
 	make -C k8s/migration/ build-installer && cp k8s/migration/dist/install.yaml image_builder/deploy/00controller.yaml
-
+	
 .PHONY: build-vpwned
 build-vpwned:
 	make -C pkg/vpwned docker-build docker-push

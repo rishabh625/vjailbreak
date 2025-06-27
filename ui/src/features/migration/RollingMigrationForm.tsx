@@ -957,6 +957,7 @@ export default function RollingMigrationFormDrawer({
             // Create cluster mapping between VMware cluster and PCD cluster
             const selectedPCD = pcdData.find(p => p.id === destinationPCD);
             const pcdClusterName = selectedPCD?.name || "";
+            const targetPCDClusterName = selectedPCD?.name;
 
             const clusterMapping: ClusterMapping[] = [{
                 vmwareClusterName: clusterName,
@@ -1004,7 +1005,8 @@ export default function RollingMigrationFormDrawer({
                 vmwareRef: selectedVMwareCredName,
                 openstackRef: selectedPcdCredName,
                 networkMapping: networkMappingResponse.metadata.name,
-                storageMapping: storageMappingResponse.metadata.name
+                storageMapping: storageMappingResponse.metadata.name,
+                targetPCDClusterName: targetPCDClusterName,
             });
             const migrationTemplateResponse = await postMigrationTemplate(migrationTemplateJson);
 
@@ -1068,7 +1070,7 @@ export default function RollingMigrationFormDrawer({
             !selectedVMs.length ||
             submitting;
 
-        
+
         const mappingsValid = !(availableVmwareNetworks.some(network =>
             !networkMappings.some(mapping => mapping.source === network)) ||
             availableVmwareDatastores.some(datastore =>

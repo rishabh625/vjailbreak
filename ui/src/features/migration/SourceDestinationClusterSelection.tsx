@@ -267,7 +267,13 @@ export default function SourceDestinationClusterSelection({
                                                 {/* @ts-ignore */}
                                                 <cds-icon shape="cluster" size="md"></cds-icon>
                                             </CdsIconWrapper>
-                                            {pcd.name}
+                                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                                <Typography variant="body1">{pcd.name}</Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Credential: {pcd.openstackCredName} | Tenant: {pcd.tenantName}
+
+                                                </Typography>
+                                            </Box>
                                         </Box>
                                     </MenuItem>
                                 ))

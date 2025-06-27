@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { getVmwareCredentialsList } from "src/api/vmware-creds/vmwareCreds"
 import { getVMwareClusters } from "src/api/vmware-clusters/vmwareClusters"
 import { getPCDClusters } from "src/api/pcd-clusters"
-import { getSecret } from "src/api/secrets/secrets"
+import { getSecret, getSecrets } from "src/api/secrets/secrets"
 import { VJAILBREAK_DEFAULT_NAMESPACE } from "src/api/constants"
 import { VMwareCreds } from "src/api/vmware-creds/model"
 import { VMwareCluster } from "src/api/vmware-clusters/model"
@@ -22,6 +22,7 @@ export interface PcdDataItem {
   id: string
   name: string
   openstackCredName: string
+  tenantName: string
 }
 
 interface ClusterDataState {
@@ -48,7 +49,11 @@ export const useClusterData = (
   const [loadingVMware, setLoadingVMware] = useState(false)
   const [loadingPCD, setLoadingPCD] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  const fetchSecrets = async () => {
+    // This function is kept for compatibility with refetchAll
+    // but secrets are now fetched directly in fetchPcdData when needed
+    return await getSecrets(VJAILBREAK_DEFAULT_NAMESPACE)
+  }
   const fetchSourceData = async () => {
     setLoadingVMware(true)
     setError(null)
@@ -128,19 +133,41 @@ export const useClusterData = (
         return
       }
 
-      const clusterData = pcdClusters.items.map((cluster: PCDCluster) => {
-        const clusterName = cluster.spec.clusterName
-        const openstackCredName =
-          cluster.metadata.labels?.["vjailbreak.k8s.pf9.io/openstackcreds"] ||
-          ""
+      // Ensure we have fresh secrets data
+      const currentSecrets = await getSecrets(VJAILBREAK_DEFAULT_NAMESPACE)
 
-        return {
-          id: clusterName,
-          name: clusterName,
-          openstackCredName: openstackCredName,
+      const clusterDataPromises = pcdClusters.items.map(
+        async (cluster: PCDCluster) => {
+          const clusterName = cluster.spec.clusterName
+          const openstackCredName =
+            cluster.metadata.labels?.["vjailbreak.k8s.pf9.io/openstackcreds"] ||
+            ""
+
+          let tenantName = ""
+
+          // Try to find secret with exact name format: {openstackCredName}-openstack-secret
+          if (openstackCredName) {
+            // @ts-expect-error - currentSecrets is a SecretList
+            const secret = currentSecrets?.items?.find((secret) =>
+              secret?.metadata?.name?.includes(openstackCredName)
+            )
+            if (secret?.data?.OS_TENANT_NAME) {
+              tenantName = atob(secret.data.OS_TENANT_NAME)
+            } else if (secret?.data?.OS_PROJECT_NAME) {
+              tenantName = atob(secret.data.OS_PROJECT_NAME)
+            }
+          }
+
+          return {
+            id: openstackCredName + " - " + tenantName + " - " + clusterName,
+            name: clusterName,
+            openstackCredName: openstackCredName,
+            tenantName: tenantName,
+          }
         }
-      })
+      )
 
+      const clusterData = await Promise.all(clusterDataPromises)
       setPcdData(clusterData)
     } catch (error) {
       console.error("Failed to fetch PCD clusters:", error)
@@ -151,6 +178,8 @@ export const useClusterData = (
   }
 
   const refetchAll = async () => {
+    // First fetch secrets, then fetch other data in parallel
+    await fetchSecrets()
     await Promise.all([fetchSourceData(), fetchPcdData()])
   }
 

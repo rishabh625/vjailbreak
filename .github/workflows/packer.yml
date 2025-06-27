@@ -264,6 +264,12 @@ jobs:
           input: ./ui/deploy/ui.yaml
           output: ./image_builder/deploy/01ui.yaml
 
+      - name: Substitue image tags in manifests
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ./image_builder/configs/version-config.yaml
+          output: ./image_builder/deploy/version-config.yaml
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -341,3 +347,4 @@ jobs:
           path: |
             image_builder/deploy/00controller.yaml
             image_builder/deploy/01ui.yaml
+            image_builder/deploy/version-config.yaml

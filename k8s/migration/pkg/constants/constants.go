@@ -154,7 +154,7 @@ const (
 	StartCutOverNo = "no"
 
 	// PCDClusterNameNoCluster is the name of the PCD cluster when there is no cluster
-	PCDClusterNameNoCluster = "NONE"
+	PCDClusterNameNoCluster = "NO CLUSTER"
 )
 
 // CloudInitScript contains the cloud-init script for VM initialization
