@@ -17,7 +17,7 @@ spec:
       hostNetwork: true
       initContainers:
         - name: fix-perms
-          image: alpine:latest
+          image: quay.io/platform9/vjailbreak:alpine
           securityContext:
             privileged: true
             runAsUser: 0
@@ -27,12 +27,17 @@ spec:
               echo "Fixing permissions on /home/ubuntu/vmware-vix-disklib-distrib..."
               chown -R 1000:1000 /home/ubuntu/vmware-vix-disklib-distrib
               chmod 755 /home/ubuntu/vmware-vix-disklib-distrib
+              echo "Fixing permissions on /home/ubuntu/virtio-win..."
+              chown -R 1000:1000 /home/ubuntu/virtio-win
+              chmod 755 /home/ubuntu/virtio-win
           volumeMounts:
             - name: vmwarelib
               mountPath: /home/ubuntu/vmware-vix-disklib-distrib
+            - name: virtio-win
+              mountPath: /home/ubuntu/virtio-win
       containers:
         - name: sync-container
-          image: alpine:latest
+          image: quay.io/platform9/vjailbreak:alpine
           securityContext:
             privileged: true
             runAsUser: 0
@@ -47,10 +52,11 @@ spec:
               mountPath: /home/ubuntu/vmware-vix-disklib-distrib
             - name: logs
               mountPath: /var/log/pf9
+            - name: virtio-win
+              mountPath: /home/ubuntu/virtio-win
           command: ["/bin/sh", "-c"]
           args:
             - |
-              apk add --no-cache rsync coreutils grep
               IS_MASTER=$(grep -E '^export IS_MASTER=' /etc/pf9/k3s.env | cut -d'=' -f2)
               MASTER_IP=$(grep -E '^export MASTER_IP=' /etc/pf9/k3s.env | cut -d'=' -f2)
               if [ "$IS_MASTER" = "true" ]; then
@@ -76,6 +82,9 @@ spec:
                   # Also Sync logs from master to worker
                   rsync -avz rsync://${MASTER_IP}/master-logs /var/log/pf9
 
+                  # Sync virtio-win drivers from master to worker
+                  rsync -avz rsync://${MASTER_IP}/virtio-win /home/ubuntu/virtio-win
+
                   if [ $? -eq 0 ]; then
                     echo "Sync completed successfully."
                   else
@@ -97,3 +106,7 @@ spec:
           hostPath:
             type: DirectoryOrCreate
             path: /var/log/pf9
+        - name: virtio-win
+          hostPath:
+            type: DirectoryOrCreate
+            path: /home/ubuntu/virtio-win

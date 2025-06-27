@@ -95,7 +95,7 @@ const columns: GridColDef[] = [
   {
     field: "name",
     headerName: "VM Name",
-    flex: 2,
+    flex: 2.5,
     renderCell: (params) => (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -119,9 +119,6 @@ const columns: GridColDef[] = [
         {params.row.flavorNotFound && (
           <Box display="flex" alignItems="center" gap={0.5}>
             <WarningIcon color="warning" fontSize="small" />
-            <Typography variant="body2" color="warning.main">
-              Flavor not found
-            </Typography>
           </Box>
         )}
       </Box>
@@ -134,18 +131,18 @@ const columns: GridColDef[] = [
     valueGetter: (value) => value || "- ",
   },
   {
-    field: "osType",
+    field: "osFamily",
     headerName: "OS",
     flex: 1,
     renderCell: (params) => {
-      const osType = params.row.osType || "Unknown";
-      let displayValue = osType;
+      const osFamily = params.row.osFamily || "Unknown";
+      let displayValue = osFamily;
       let icon: React.ReactNode = null;
 
-      if (osType.includes("windows")) {
+      if (osFamily.includes("windows")) {
         displayValue = "Windows";
         icon = <img src={WindowsIcon} alt="Windows" style={{ width: 20, height: 20 }} />;
-      } else if (osType.includes("linux")) {
+      } else if (osFamily.includes("linux")) {
         displayValue = "Linux";
         icon = <img src={LinuxIcon} alt="Linux" style={{ width: 20, height: 20, }} />;
       } else {
@@ -364,9 +361,18 @@ export default function VmsSelectionStep({
 
       const selectedVmNames = rowSelectionModel as string[];
 
-      const updatePromises = selectedVmNames.map(vmName =>
-        patchVMwareMachine(vmName, isAutoAssign ? "" : selectedFlavor)
-      );
+      const updatePromises = selectedVmNames.map(vmName => {
+        const vmwareMachineName = vmList.find(vm => vm.name === vmName)?.vmWareMachineName
+        const payload = {
+          spec: {
+            targetFlavorId: isAutoAssign ? "" : selectedFlavor
+          }
+        }
+        if (!vmwareMachineName) {
+          return
+        }
+        return patchVMwareMachine(vmwareMachineName, payload)
+      });
 
       await Promise.all(updatePromises);
 
@@ -480,8 +486,6 @@ export default function VmsSelectionStep({
               getRowClassName={(params) => {
                 if (params.row.vmState !== "running" || params.row.isMigrated) {
                   return "disabled-row";
-                } else if (params.row.flavorNotFound) {
-                  return "warning-row";
                 } else {
                   return "";
                 }

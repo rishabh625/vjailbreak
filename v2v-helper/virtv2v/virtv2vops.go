@@ -18,6 +18,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 )
 
@@ -120,17 +121,50 @@ func downloadFile(url, filePath string) error {
 	return nil
 }
 
+func CheckForVirtioDrivers() (bool, error) {
+
+	// Before downloading virtio windrivers Check if iso is present in the path
+	preDownloadPath := "/home/fedora/virtio-win"
+
+	// Check if path exists
+	_, err := os.Stat(preDownloadPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if path exists: %s", err)
+	}
+	// Check if iso is present in the path
+	files, err := os.ReadDir(preDownloadPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read directory: %s", err)
+	}
+	for _, file := range files {
+		if file.Name() == "virtio-win.iso" {
+			log.Println("Found virtio windrivers")
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func ConvertDisk(ctx context.Context, xmlFile, path, ostype, virtiowindriver string, firstbootscripts []string, useSingleDisk bool, diskPath string) error {
 	// Step 1: Handle Windows driver injection
-	if ostype == "windows" {
-		filePath := "/home/fedora/virtio-win.iso"
-		log.Println("Downloading virtio windrivers")
-		err := downloadFile(virtiowindriver, filePath)
+	if strings.ToLower(ostype) == constants.OSFamilyWindows {
+		filePath := "/home/fedora/virtio-win/virtio-win.iso"
+
+		found, err := CheckForVirtioDrivers()
 		if err != nil {
-			return fmt.Errorf("failed to download virtio-win: %s", err)
+			log.Printf("failed to check for virtio drivers: %s", err)
+			log.Println("Downloading virtio windrivers instead of using the existing one")
 		}
-		log.Println("Downloaded virtio windrivers")
-		defer os.Remove(filePath)
+		if found {
+			log.Println("Found virtio windrivers")
+		} else {
+			log.Println("Downloading virtio windrivers")
+			err := downloadFile(virtiowindriver, filePath)
+			if err != nil {
+				return fmt.Errorf("failed to download virtio-win: %s", err)
+			}
+			log.Println("Downloaded virtio windrivers")
+		}
 		os.Setenv("VIRTIO_WIN", filePath)
 	}
 
@@ -138,7 +172,7 @@ func ConvertDisk(ctx context.Context, xmlFile, path, ostype, virtiowindriver str
 	os.Setenv("LIBGUESTFS_BACKEND", "direct")
 
 	// Step 3: Prepare virt-v2v args
-	args := []string{"--firstboot", "/home/fedora/scripts/user_firstboot.sh"}
+	args := []string{"-v", "--firstboot", "/home/fedora/scripts/user_firstboot.sh"}
 	for _, script := range firstbootscripts {
 		args = append(args, "--firstboot", fmt.Sprintf("/home/fedora/%s.sh", script))
 	}
@@ -206,7 +240,7 @@ DHCP=yes`
 		ans, err = RunCommandInGuestAllVolumes(disks, command, true, "/home/fedora/99-wildcard.network", "/etc/systemd/network/99-wildcard.network")
 	}
 	if err != nil {
-		fmt.Printf("failed to run command (%s): %v\n", ans, err)
+		fmt.Printf("failed to run command (%s): %v: %s\n", "upload", err, strings.TrimSpace(ans))
 		return err
 	}
 	return nil
@@ -240,7 +274,7 @@ func RunCommandInGuest(path string, command string, write bool) (string, error) 
 	log.Printf("Executing %s", cmd.String()+" "+command)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to run command (%s): %v", command, err)
+		return "", fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(string(out)))
 	}
 	return strings.ToLower(strings.TrimSpace(string(out))), nil
 }
@@ -253,14 +287,14 @@ func CheckForLVM(disks []vm.VMDisk) (string, error) {
 	command := "inspect-os"
 	osPath, err := RunCommandInGuestAllVolumes(disks, command, false)
 	if err != nil {
-		return "", fmt.Errorf("failed to run command (%s): %v", command, err)
+		return "", fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(osPath))
 	}
 
 	// Get the lvs list
 	command = "lvs"
 	lvsStr, err := RunCommandInGuestAllVolumes(disks, command, false)
 	if err != nil {
-		return "", fmt.Errorf("failed to run command (%s): %v", command, err)
+		return "", fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(lvsStr))
 	}
 
 	lvs := strings.Split(string(lvsStr), "\n")
@@ -294,7 +328,7 @@ func RunCommandInGuestAllVolumes(disks []vm.VMDisk, command string, write bool, 
 	log.Printf("Executing %s", cmd.String())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to run command (%s): %v", command, err)
+		return "", fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(string(out)))
 	}
 	return strings.ToLower(string(out)), nil
 }
@@ -303,29 +337,29 @@ func GetBootableVolumeIndex(disks []vm.VMDisk) (int, error) {
 	command := "list-partitions"
 	partitionsStr, err := RunCommandInGuestAllVolumes(disks, command, false)
 	if err != nil {
-		return -1, fmt.Errorf("failed to run command (%s): %v", command, err)
+		return -1, fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(partitionsStr))
 	}
 
-	partitions := strings.Split(string(partitionsStr), "\n")
+	partitions := strings.Split(strings.TrimSpace(partitionsStr), "\n")
 	for _, partition := range partitions {
 		command := "part-to-dev"
 		device, err := RunCommandInGuestAllVolumes(disks, command, false, strings.TrimSpace(partition))
 		if err != nil {
-			fmt.Printf("failed to run command (%s): %v\n", device, err)
+			fmt.Printf("failed to run command (%s): %v: %s\n", device, err, strings.TrimSpace(device))
 			return -1, err
 		}
 
 		command = "part-to-partnum"
 		num, err := RunCommandInGuestAllVolumes(disks, command, false, strings.TrimSpace(partition))
 		if err != nil {
-			fmt.Printf("failed to run command (%s): %v\n", num, err)
+			fmt.Printf("failed to run command (%s): %v: %s\n", num, err, strings.TrimSpace(num))
 			return -1, err
 		}
 
 		command = "part-get-bootable"
 		bootable, err := RunCommandInGuestAllVolumes(disks, command, false, strings.TrimSpace(device), strings.TrimSpace(num))
 		if err != nil {
-			fmt.Printf("failed to run command (%s): %v\n", bootable, err)
+			fmt.Printf("failed to run command (%s): %v: %s\n", bootable, err, strings.TrimSpace(bootable))
 			return -1, err
 		}
 
@@ -333,7 +367,7 @@ func GetBootableVolumeIndex(disks []vm.VMDisk) (int, error) {
 			command = "device-index"
 			index, err := RunCommandInGuestAllVolumes(disks, command, false, strings.TrimSpace(device))
 			if err != nil {
-				fmt.Printf("failed to run command (%s): %v\n", index, err)
+				fmt.Printf("failed to run command (%s): %v: %s\n", index, err, strings.TrimSpace(index))
 				return -1, err
 			}
 			return strconv.Atoi(strings.TrimSpace(index))

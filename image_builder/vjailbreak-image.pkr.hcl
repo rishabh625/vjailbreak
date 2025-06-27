@@ -11,11 +11,11 @@ source "qemu" "vjailbreak-image" {
   disk_image           = true
   skip_compaction      = true
   iso_url              = "vjailbreak-image.qcow2"
-  iso_checksum         = "sha256:4691136dbabceb37d9d03ff10cf717f37cd8076b248c6d74d4ef316f4d4b6f50"
+  iso_checksum         = "sha256:e0514d0ee287ca7fec7670e41ba67304f57eded5f4151f87734d7d3cc0a0d60a"
   iso_target_extension = "qcow2"
   output_directory     = "vjailbreak_qcow2"
   vm_name              = "vjailbreak-image.qcow2"
-  disk_size            = "10G"
+  disk_size            = "50G"
   format               = "qcow2"
   headless             = true
   accelerator          = "kvm"
@@ -68,23 +68,34 @@ build {
     destination = "/tmp/env"
   }
 
+  provisioner "file" {
+    source      = "${path.root}/scripts/download_images.sh"
+    destination = "/tmp/download_images.sh"
+  }
+
+  provisioner "file" {
+    source      = "${path.root}/images"
+    destination = "/home/ubuntu"
+  }
+
   provisioner "shell" {
     inline = [
-      "sudo curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3",
-      "sudo chmod 700 get_helm.sh",
-      "sudo ./get_helm.sh",
-      "sudo mkdir -p /etc/pf9",
-      "sudo mv /tmp/install.sh /etc/pf9/install.sh",
-      "sudo mv /tmp/k3s.env /etc/pf9/k3s.env",
-      "sudo mv /tmp/yamls /etc/pf9/yamls",
-      "sudo mv /tmp/rsyncd.conf /etc/pf9/rsyncd.conf",
-      "sudo mv /tmp/daemonset.yaml /etc/pf9/yamls/daemonset.yaml",
-      "sudo mv /tmp/env /etc/pf9/env",
-      "sudo chmod +x /etc/pf9/install.sh",
-      "sudo chown root:root /etc/pf9/k3s.env",
-      "sudo chmod 644 /etc/pf9/k3s.env",
-      "sudo chmod 644 /etc/pf9/env",
-      "echo '@reboot root /etc/pf9/install.sh' | sudo tee -a /etc/crontab"
+    "sudo mv /tmp/install.sh /etc/pf9/install.sh",
+    "sudo mv /tmp/k3s.env /etc/pf9/k3s.env",
+    "sudo mkdir -p image_builder/images",
+    "sudo mv /tmp/download_images.sh /etc/pf9/download_images.sh",
+    "sudo mv /home/ubuntu/images/* /etc/pf9/images",
+    "sudo mv /tmp/yamls /etc/pf9/yamls",
+    "sudo mv /tmp/rsyncd.conf /etc/pf9/rsyncd.conf",
+    "sudo mv /tmp/daemonset.yaml /etc/pf9/yamls/daemonset.yaml",
+    "sudo mv /tmp/env /etc/pf9/env",
+    "sudo chmod +x /etc/pf9/install.sh",
+    "sudo chown root:root /etc/pf9/k3s.env",
+    "sudo chmod 644 /etc/pf9/k3s.env",
+    "sudo chmod 644 /etc/pf9/env",
+    "sudo df -h",
+    "echo '@reboot root /etc/pf9/install.sh' | sudo tee -a /etc/crontab"
     ]
   }
 }
+

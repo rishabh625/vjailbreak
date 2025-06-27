@@ -7,7 +7,8 @@ export interface VMwareVM {
   networks?: string[]
   vmState: string
   ipAddress?: string
-  osType?: string
+  assignedIp?: string
+  osFamily?: string
 }
 
 export interface VMwareMachine {
@@ -28,6 +29,13 @@ export interface VMwareMachine {
   status: {
     migrated: boolean
     powerState: string
+    conditions?: Array<{
+      type: string
+      status: string
+      reason: string
+      message: string
+      lastTransitionTime: string
+    }>
   }
 }
 

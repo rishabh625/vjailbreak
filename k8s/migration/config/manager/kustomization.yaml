@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: omkardeshpande7/vjailbreak-controller
-  newTag: resmgr2
+  newName: quay.io/platform9/vjailbreak-controller
+  newTag: v0.1.15

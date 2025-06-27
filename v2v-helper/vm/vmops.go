@@ -5,6 +5,7 @@ package vm
 import (
 	"context"
 	"fmt"
+<<<<<<< HEAD
 	reflect "reflect"
 	"strings"
 	"time"
@@ -12,6 +13,13 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
+=======
+	"log"
+	"strings"
+	"time"
+
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
+>>>>>>> 6eaa83d68f443715a8071388f0d7cc95e79ffb62
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -30,12 +38,17 @@ import (
 type VMOperations interface {
 	GetVMInfo(ostype string) (VMInfo, error)
 	GetVMObj() *object.VirtualMachine
-	UpdateDiskInfo(vminfo VMInfo) (VMInfo, error)
+	UpdateDiskInfo(*VMInfo, VMDisk, bool) error
+	UpdateDisksInfo(*VMInfo) error
 	IsCBTEnabled() (bool, error)
 	EnableCBT() error
 	TakeSnapshot(name string) error
 	DeleteSnapshot(name string) error
+	DeleteSnapshotByRef(snap *types.ManagedObjectReference) error
 	GetSnapshot(name string) (*types.ManagedObjectReference, error)
+	ListSnapshots() ([]types.VirtualMachineSnapshotTree, error)
+	CleanUpSnapshots(ignoreerror bool) error
+	DeleteMigrationSnapshots(snapshots []types.VirtualMachineSnapshotTree, ignoreerror bool) error
 	CustomQueryChangedDiskAreas(baseChangeID string, curSnapshot *types.ManagedObjectReference, disk *types.VirtualDisk, offset int64) (types.DiskChangeInfo, error)
 	VMGuestShutdown() error
 	VMPowerOff() error
@@ -118,15 +131,6 @@ func (vmops *VMOps) GetVMObj() *object.VirtualMachine {
 	return vmops.VMObj
 }
 
-// func getVMs(ctx context.Context, finder *find.Finder) ([]*object.VirtualMachine, error) {
-// 	// Find all virtual machines on the host
-// 	vms, err := finder.VirtualMachineList(ctx, "*")
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return vms, nil
-// }
-
 func (vmops *VMOps) GetVMInfo(ostype string) (VMInfo, error) {
 	vm := vmops.VMObj
 
@@ -153,15 +157,14 @@ func (vmops *VMOps) GetVMInfo(ostype string) (VMInfo, error) {
 		}
 	}
 
-	vmdisks := []VMDisk{} // Create an empty slice of Disk structs
+	vmdisks := []VMDisk{}
 	for _, device := range o.Config.Hardware.Device {
 		if disk, ok := device.(*types.VirtualDisk); ok {
 			vmdisks = append(vmdisks, VMDisk{
 				Name: disk.DeviceInfo.GetDescription().Label,
 				Size: disk.CapacityInBytes,
 				Disk: disk,
-			},
-			)
+			})
 		}
 	}
 	uefi := false
@@ -169,10 +172,10 @@ func (vmops *VMOps) GetVMInfo(ostype string) (VMInfo, error) {
 		uefi = true
 	}
 	if ostype == "" {
-		if o.Guest.GuestFamily == string(types.VirtualMachineGuestOsFamilyWindowsGuest) {
-			ostype = "windows"
-		} else if o.Guest.GuestFamily == string(types.VirtualMachineGuestOsFamilyLinuxGuest) {
-			ostype = "linux"
+		if strings.ToLower(o.Guest.GuestFamily) == strings.ToLower(string(types.VirtualMachineGuestOsFamilyWindowsGuest)) {
+			ostype = constants.OSFamilyWindows
+		} else if strings.ToLower(o.Guest.GuestFamily) == strings.ToLower(string(types.VirtualMachineGuestOsFamilyLinuxGuest)) {
+			ostype = constants.OSFamilyLinux
 		} else {
 			return VMInfo{}, fmt.Errorf("no OS type provided and unable to determine OS type")
 		}
@@ -227,7 +230,7 @@ func getChangeID(disk *types.VirtualDisk) (*ChangeID, error) {
 	return parseChangeID(changeId)
 }
 
-func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
+func (vmops *VMOps) UpdateDisksInfo(vminfo *VMInfo) error {
 	pc := vmops.vcclient.VCPropertyCollector
 	vm := vmops.VMObj
 	var snapbackingdisk []string
@@ -237,7 +240,7 @@ func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
 	var o mo.VirtualMachine
 	err := vm.Properties(vmops.ctx, vm.Reference(), []string{}, &o)
 	if err != nil {
-		return vminfo, fmt.Errorf("failed to get VM properties: %s", err)
+		return fmt.Errorf("failed to get VM properties: %s", err)
 	}
 
 	if o.Snapshot != nil {
@@ -245,7 +248,7 @@ func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
 		var s mo.VirtualMachineSnapshot
 		err := pc.RetrieveOne(vmops.ctx, o.Snapshot.CurrentSnapshot.Reference(), []string{}, &s)
 		if err != nil {
-			return vminfo, fmt.Errorf("failed to get snapshot properties: %s", err)
+			return fmt.Errorf("failed to get snapshot properties: %s", err)
 		}
 
 		for _, device := range s.Config.Hardware.Device {
@@ -257,7 +260,7 @@ func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
 				snapname = append(snapname, o.Snapshot.CurrentSnapshot.Value)
 				changeid, err := getChangeID(disk)
 				if err != nil {
-					return vminfo, fmt.Errorf("failed to get change ID: %s", err)
+					return fmt.Errorf("failed to get change ID: %s", err)
 				}
 				snapid = append(snapid, changeid.Value)
 			}
@@ -275,7 +278,61 @@ func (vmops *VMOps) UpdateDiskInfo(vminfo VMInfo) (VMInfo, error) {
 		copyRDMDisks(&vminfo, rdmDIskInfo)
 	}
 
-	return vminfo, nil
+	return nil
+}
+
+func (vmops *VMOps) UpdateDiskInfo(vminfo *VMInfo, disk VMDisk, blockCopySuccess bool) error {
+	pc := vmops.vcclient.VCPropertyCollector
+	vm := vmops.VMObj
+	var snapbackingdisk []string
+	var snapname []string
+	var snapid []string
+
+	var o mo.VirtualMachine
+	err := vm.Properties(vmops.ctx, vm.Reference(), []string{}, &o)
+	if err != nil {
+		return fmt.Errorf("failed to get VM properties: %s", err)
+	}
+
+	if o.Snapshot != nil {
+		// get backing disk of snapshot
+		var s mo.VirtualMachineSnapshot
+		err := pc.RetrieveOne(vmops.ctx, o.Snapshot.CurrentSnapshot.Reference(), []string{}, &s)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot properties: %s", err)
+		}
+
+		for _, device := range s.Config.Hardware.Device {
+			switch disk := device.(type) {
+			case *types.VirtualDisk:
+				backing := disk.Backing.(types.BaseVirtualDeviceFileBackingInfo)
+				info := backing.GetVirtualDeviceFileBackingInfo()
+				snapbackingdisk = append(snapbackingdisk, info.FileName)
+				snapname = append(snapname, o.Snapshot.CurrentSnapshot.Value)
+				changeid, err := getChangeID(disk)
+				if err != nil {
+					return fmt.Errorf("failed to get change ID: %s", err)
+				}
+				snapid = append(snapid, changeid.Value)
+			}
+		}
+		for idx, _ := range vminfo.VMDisks {
+			if vminfo.VMDisks[idx].Name == disk.Name {
+				if blockCopySuccess {
+					vminfo.VMDisks[idx].ChangeID = snapid[idx]
+				}
+				vminfo.VMDisks[idx].SnapBackingDisk = snapbackingdisk[idx]
+				vminfo.VMDisks[idx].Snapname = snapname[idx]
+				log.Println(fmt.Sprintf("Updated disk info for %s", disk.Name))
+				log.Println(fmt.Sprintf("Snapshot backing disk: %s", snapbackingdisk[idx]))
+				log.Println(fmt.Sprintf("Snapshot name: %s", snapname[idx]))
+				log.Println(fmt.Sprintf("Change ID: %s", snapid[idx]))
+				break
+			}
+		}
+	}
+
+	return nil
 }
 
 func (vmops *VMOps) IsCBTEnabled() (bool, error) {
@@ -325,6 +382,32 @@ func (vmops *VMOps) DeleteSnapshot(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete snapshot: %s", err)
 	}
+	err = task.Wait(vmops.ctx)
+	if err != nil {
+		return fmt.Errorf("failed while waiting for task: %s", err)
+	}
+	return nil
+}
+
+func (vmops *VMOps) DeleteSnapshotByRef(snap *types.ManagedObjectReference) error {
+	// Create a method to remove snapshot using the reference
+	var consolidate = true
+
+	// Create a RemoveSnapshot_Task request
+	req := types.RemoveSnapshot_Task{
+		This:           *snap,
+		RemoveChildren: true,
+		Consolidate:    &consolidate,
+	}
+
+	// Send the request
+	res, err := methods.RemoveSnapshot_Task(vmops.ctx, vmops.vcclient.VCClient, &req)
+	if err != nil {
+		return fmt.Errorf("failed to remove snapshot by ref: %s", err)
+	}
+
+	// Create a task object and wait for completion
+	task := object.NewTask(vmops.vcclient.VCClient, res.Returnval)
 	err = task.Wait(vmops.ctx)
 	if err != nil {
 		return fmt.Errorf("failed while waiting for task: %s", err)
@@ -526,4 +609,74 @@ func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine)
 			}
 		}
 	}
+func (vmops *VMOps) ListSnapshots() ([]types.VirtualMachineSnapshotTree, error) {
+	vm := vmops.VMObj
+	var o mo.VirtualMachine
+	err := vm.Properties(vmops.ctx, vm.Reference(), []string{"snapshot"}, &o)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VM properties: %s", err)
+	}
+	// Check if o.Snapshot is nil before accessing RootSnapshotList
+	if o.Snapshot == nil {
+		// VM has no snapshots
+		return []types.VirtualMachineSnapshotTree{}, nil
+	}
+	return o.Snapshot.RootSnapshotList, nil
+}
+
+func (vmops *VMOps) DeleteMigrationSnapshots(snapshots []types.VirtualMachineSnapshotTree, ignoreerror bool) error {
+	var lastError error
+	snapshotsDeleted := 0
+
+	// Helper function to recursively process snapshot tree
+	var processSnapshotTree func(trees []types.VirtualMachineSnapshotTree) int
+	processSnapshotTree = func(trees []types.VirtualMachineSnapshotTree) int {
+		deleted := 0
+		for _, snapshot := range trees {
+			// First process any child snapshots
+			if len(snapshot.ChildSnapshotList) > 0 {
+				deleted += processSnapshotTree(snapshot.ChildSnapshotList)
+			}
+
+			// Then process this snapshot if it matches
+			if snapshot.Name == constants.MigrationSnapshotName {
+				// Delete snapshot by snapshot reference instead of name to handle duplicate names
+				err := vmops.DeleteSnapshotByRef(&snapshot.Snapshot)
+				if err != nil {
+					if ignoreerror {
+						lastError = err
+						log.Printf("Failed to delete snapshot %s: %v (ignoring error)", snapshot.Name, err)
+						continue
+					} else {
+						// Propagate error up
+						lastError = fmt.Errorf("failed to delete snapshot %s: %v", snapshot.Name, err)
+						return deleted
+					}
+				}
+				deleted++
+			}
+		}
+		return deleted
+	}
+
+	// Start the recursive processing
+	snapshotsDeleted = processSnapshotTree(snapshots)
+
+	if snapshotsDeleted > 0 {
+		log.Printf("Successfully deleted %d snapshots with name '%s'", snapshotsDeleted, constants.MigrationSnapshotName)
+	}
+
+	if !ignoreerror && lastError != nil {
+		return lastError
+	}
+
+	return nil
+}
+
+func (vmops *VMOps) CleanUpSnapshots(ignoreerror bool) error {
+	snapshotlist, err := vmops.ListSnapshots()
+	if err != nil {
+		return err
+	}
+	return vmops.DeleteMigrationSnapshots(snapshotlist, ignoreerror)
 }

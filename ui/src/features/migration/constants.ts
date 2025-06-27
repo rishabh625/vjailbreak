@@ -8,8 +8,8 @@ export enum CUTOVER_TYPES {
 
 export enum OS_TYPES {
   "AUTO_DETECT" = "default",
-  "WINDOWS" = "windows",
-  "LINUX" = "linux",
+  "WINDOWS" = "windowsGuest",
+  "LINUX" = "linuxGuest",
 }
 
 export const DATA_COPY_OPTIONS = [

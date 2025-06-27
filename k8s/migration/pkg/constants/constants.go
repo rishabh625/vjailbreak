@@ -142,6 +142,9 @@ const (
 	StartCutOverYes = "yes"
 
 	// MaxVCPUs is the maximum number of vCPUs
+	OSFamilyWindows = "windows"
+	OSFamilyLinux   = "linux"
+
 	MaxVCPUs = 99999
 
 	// MaxRAM is the maximum amount of RAM
@@ -149,6 +152,9 @@ const (
 
 	// StartCutOverNo is the value for start cut over no
 	StartCutOverNo = "no"
+
+	// PCDClusterNameNoCluster is the name of the PCD cluster when there is no cluster
+	PCDClusterNameNoCluster = "NO CLUSTER"
 )
 
 // CloudInitScript contains the cloud-init script for VM initialization

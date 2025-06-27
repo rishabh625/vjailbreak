@@ -34,9 +34,9 @@ type MigrationTemplateDestination struct {
 
 // MigrationTemplateSpec defines the desired state of MigrationTemplate including source/destination environments and mappings
 type MigrationTemplateSpec struct {
-	// OSType is the OS type of the virtual machine
-	// +kubebuilder:validation:Enum=windows;linux
-	OSType string `json:"osType,omitempty"`
+	// OSFamily is the OS type of the virtual machine
+	// +kubebuilder:validation:Enum=windowsGuest;linuxGuest
+	OSFamily string `json:"osFamily,omitempty"`
 	// VirtioWinDriver is the driver to be used for the virtual machine
 	VirtioWinDriver string `json:"virtioWinDriver,omitempty"`
 	// NetworkMapping is the reference to the NetworkMapping resource that defines source to destination network mappings

@@ -58,6 +58,7 @@ export default defineConfig({
 						{ label: 'Injecting Custom Environment Variables', slug: 'guides/injecting_custom_env' },
 						{ label: 'Debug Log Collection', slug: 'guides/debuglogs' },
 						{ label: 'Debug vJailbreak Installation', slug: 'guides/debug_vjailbreak_install' },
+						{ label: 'User-Provided VirtIO Windows Driver Support', slug: 'guides/virtio_doc' },
 					],
 				},
 				{

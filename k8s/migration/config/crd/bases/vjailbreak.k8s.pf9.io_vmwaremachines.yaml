@@ -52,6 +52,9 @@ spec:
               vms:
                 description: VMInfo is the info of the VMs in the VMwareMachine
                 properties:
+                  assignedIp:
+                    description: AssignedIp is the IP address assigned to the VM
+                    type: string
                   clusterName:
                     description: ClusterName is the name of the cluster
                     type: string
@@ -87,8 +90,8 @@ spec:
                     items:
                       type: string
                     type: array
-                  osType:
-                    description: OSType is the OS type of the virtual machine
+                  osFamily:
+                    description: OSFamily is the OS family of the virtual machine
                     type: string
                   rdmDisks:
                     description: RDMDisks is the list of RDM disks for the virtual

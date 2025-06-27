@@ -63,7 +63,7 @@ func startgRPCServer(ctx context.Context, network, port string) error {
 	api.RegisterVersionServer(grpcServer, &VpwnedVersion{})
 	api.RegisterVCenterServer(grpcServer, &targetVcenterGRPC{})
 	api.RegisterBMProviderServer(grpcServer, &providersGRPC{})
-
+	api.RegisterVailbreakProxyServer(grpcServer, &vjailbreakProxy{})
 	reflection.Register(grpcServer)
 	connection, err := net.Listen(network, port)
 	if err != nil {
@@ -119,7 +119,10 @@ func getHTTPServer(ctx context.Context, port, grpcSocket string) (*http.ServeMux
 	if err := api.RegisterVCenterHandlerFromEndpoint(ctx, gatewayMuxer, grpcSocket, option); err != nil {
 		logrus.Errorf("cannot start handler for VCenter")
 	}
-
+	// Register VJailbreakProxy service
+	if err := api.RegisterVailbreakProxyHandlerFromEndpoint(ctx, gatewayMuxer, grpcSocket, option); err != nil {
+		logrus.Errorf("cannot start handler for VailbreakProxy")
+	}
 	mux.Handle("/", APILogger(gatewayMuxer))
 	return mux, nil
 }

@@ -35,6 +35,7 @@ type MigrationParams struct {
 	Debug                  bool
 	TARGET_FLAVOR_ID       string
 	TargetAvailabilityZone string
+	AssignedIP             string
 }
 
 // GetMigrationConfigMapName is function that returns the name of the secret
@@ -67,7 +68,7 @@ func GetMigrationParams(ctx context.Context, client client.Client) (*MigrationPa
 		OpenstackNetworkPorts:  string(configMap.Data["NEUTRON_PORT_IDS"]),
 		OpenstackVolumeTypes:   string(configMap.Data["CINDER_VOLUME_TYPES"]),
 		OpenstackVirtioWin:     string(configMap.Data["VIRTIO_WIN_DRIVER"]),
-		OpenstackOSType:        string(configMap.Data["OS_TYPE"]),
+		OpenstackOSType:        string(configMap.Data["OS_FAMILY"]),
 		OpenstackConvert:       string(configMap.Data["CONVERT"]) == constants.TrueString,
 		DataCopyStart:          string(configMap.Data["DATACOPYSTART"]),
 		VMcutoverStart:         string(configMap.Data["CUTOVERSTART"]),
@@ -78,5 +79,6 @@ func GetMigrationParams(ctx context.Context, client client.Client) (*MigrationPa
 		Debug:                  string(configMap.Data["DEBUG"]) == constants.TrueString,
 		TARGET_FLAVOR_ID:       string(configMap.Data["TARGET_FLAVOR_ID"]),
 		TargetAvailabilityZone: string(configMap.Data["TARGET_AVAILABILITY_ZONE"]),
+		AssignedIP:             string(configMap.Data["ASSIGNED_IP"]),
 	}, nil
 }

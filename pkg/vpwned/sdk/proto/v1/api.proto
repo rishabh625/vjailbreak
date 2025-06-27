@@ -416,3 +416,32 @@ message IsBMRunningRequest {
 message IsBMRunningResponse {
     bool is_running = 1;
 }
+
+message OpenstackAccessInfo {
+    string auth_url = 1;
+    string domain_name = 2;
+    bool insecure = 3;
+    string password = 4;
+    string region_name = 5;
+    string tenant_name = 6;
+    string username = 7;
+}
+
+message ValidateOpenstackIpRequest {
+    repeated string ip = 1;
+    OpenstackAccessInfo access_info = 2;
+}
+
+message ValidateOpenstackIpResponse {
+    repeated bool is_valid = 1;
+    repeated string reason = 2;
+}
+
+service VailbreakProxy {
+    rpc ValidateOpenstackIp (ValidateOpenstackIpRequest) returns (ValidateOpenstackIpResponse) {
+        option (google.api.http) = {
+            post: "/vpw/v1/validate_openstack_ip"
+            body: "*"
+        };
+    }
+}

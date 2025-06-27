@@ -10,9 +10,9 @@ write_files:
     permissions: '0644'
 runcmd:
   - echo "Validating prerequisites..."
-  - echo "Downloading and executing cloud-ctl setup script..."
-  - curl -s https://cloud-ctl.s3.us-west-1.amazonaws.com/cloud-ctl-setup | bash
-  - echo "Cloud-ctl setup script executed successfully."
+  - echo "Downloading and executing pcdctl setup script..."
+  - curl -s https://pcdctl.s3.us-west-2.amazonaws.com/pcdctl-setup | bash
+  - echo "pcdctl setup script executed successfully."
   {{ if .Insecure }}
   - 'openssl s_client -showcerts -connect {{ .FQDN }}:443 2>/dev/null </dev/null | sed -ne "/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p" > /tmp/du.crt'
   - 'cp /tmp/du.crt /usr/local/share/ca-certificates'
@@ -20,22 +20,23 @@ runcmd:
   - 'curl {{ .KeystoneURL }}'
   {{ end }}
   - |
-    for cmd in curl cloud-ctl; do
+    for cmd in curl pcdctl; do
       if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "Error: Required command '$cmd' is not installed. Please install it and retry." >&2
         exit 1
       fi
     done
   - echo "All prerequisites met. Proceeding with setup."
-  - echo "Configuring cloud-ctl..."
+  - echo "Configuring pcdctl..."
   - |
-    cloud-ctl config set \
+    pcdctl config set \
       -u {{ .AuthURL }} \
       -e {{ .Username }} \
       -r {{ .RegionName }} \
       -t {{.TenantName}} \
-      -p '{{.Password}}'
-  - echo "Cloud-ctl configuration set successfully."
+      -p '{{.Password}}' \
+      --no-prompt
+  - echo "pcdctl configuration set successfully."
   - echo "Preparing the node..."
-  - cloud-ctl prep-node
+  - pcdctl prep-node
   - echo "Node preparation complete. Setup finished successfully."

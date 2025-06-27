@@ -137,6 +137,12 @@ func (r *OpenstackCredsReconciler) reconcileNormal(ctx context.Context,
 			return ctrl.Result{}, errors.Wrap(err, "failed to get Openstack credentials from secret")
 		}
 
+		ctxlog.Info("Creating dummy PCD cluster", "openstackcreds", scope.OpenstackCreds.Name)
+		err = utils.CreateEntryForNoPCDCluster(ctx, r.Client, scope.OpenstackCreds)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return ctrl.Result{}, errors.Wrap(err, "failed to create dummy PCD cluster")
+		}
+
 		flavors, err := utils.ListAllFlavors(ctx, r.Client, scope.OpenstackCreds)
 		if err != nil {
 			ctxlog.Error(err, "Failed to get flavors", "openstackcreds", scope.OpenstackCreds.Name)
@@ -201,6 +207,7 @@ func (r *OpenstackCredsReconciler) reconcileNormal(ctx context.Context,
 		}
 
 		if utils.IsOpenstackPCD(*scope.OpenstackCreds) {
+			ctxlog.Info("Syncing PCD info because openstackcreds is PCD", "openstackcreds", scope.OpenstackCreds.Name)
 			err = utils.SyncPCDInfo(ctx, r.Client, *scope.OpenstackCreds)
 			if err != nil {
 				return ctrl.Result{}, errors.Wrap(err, "failed to sync PCD info")
@@ -218,6 +225,13 @@ func (r *OpenstackCredsReconciler) reconcileDelete(ctx context.Context,
 	// Delete the associated secret
 	client := r.Client
 	secretName := scope.OpenstackCreds.Spec.SecretRef.Name
+
+	ctxlog.Info("Deleting PCD cluster", "openstackcreds", scope.OpenstackCreds.Name)
+	if err := utils.DeleteEntryForNoPCDCluster(ctx, client, scope.OpenstackCreds); err != nil {
+		ctxlog.Error(err, "Failed to delete PCD cluster", "openstackcreds", scope.OpenstackCreds.Name)
+		return ctrl.Result{}, errors.Wrap(err, "failed to delete PCD cluster")
+	}
+
 	ctxlog.Info("Deleting associated secret", "secretName", secretName, "namespace", constants.NamespaceMigrationSystem)
 	err := client.Delete(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

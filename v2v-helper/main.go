@@ -132,6 +132,7 @@ func main() {
 		K8sClient:              client,
 		TargetFlavorId:         migrationparams.TARGET_FLAVOR_ID,
 		TargetAvailabilityZone: migrationparams.TargetAvailabilityZone,
+		AssignedIP:             migrationparams.AssignedIP,
 	}
 
 	if err := migrationobj.MigrateVM(ctx); err != nil {

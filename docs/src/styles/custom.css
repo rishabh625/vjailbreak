@@ -49,7 +49,7 @@ h1, h2, h3, h4, h5, h6 {
 .hero-image {
   width: 100%;  /* This will make the image take the full width of its container */
   height: auto;  /* Maintain aspect ratio */
-  max-width: 1200px;  /* Optional: to limit the image width to a max */
+  max-width: 1400px;  /* Optional: to limit the image width to a max */
   margin: 0 auto;  /* Centers the image */
 }
 

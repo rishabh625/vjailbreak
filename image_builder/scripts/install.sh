@@ -39,8 +39,6 @@ log "IS_MASTER: ${IS_MASTER}"
 log "MASTER_IP: ${MASTER_IP}"
 log "K3S_TOKEN: ${K3S_TOKEN}"
 
-# Specify the desired K3s version here
-K3S_VERSION="v1.31.5+k3s1" 
 
 # Function to wait for K3s to be ready
 wait_for_k3s() {
@@ -70,7 +68,7 @@ if [ "$IS_MASTER" == "true" ]; then
   log "Setting up K3s Master..."
 
   # Install K3s master with the specific version
-  sudo curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=$K3S_VERSION sh -s - --disable traefik
+  INSTALL_K3S_SKIP_DOWNLOAD=true /etc/pf9/k3s-setup/k3s-install.sh --disable traefik
   check_command "Installing K3s master"
 
   # Wait for K3s to be ready
@@ -81,20 +79,15 @@ if [ "$IS_MASTER" == "true" ]; then
   sudo kubectl config view --raw > ~/.kube/config
   check_command "Moving kubeconfig"
 
-  # Create a configuration YAML file with the master IP populated
-  cat <<EOF > values.yaml
-controller:
-  service:
-    loadBalancerIP: "$MASTER_IP"
-    ingressClass: nginx
-EOF
-
-  log "YAML file 'values.yaml' has been created with the master IP."
+  # Load images
+  log "Loading all the images in /etc/pf9/images..."
+  for img in /etc/pf9/images/*.tar; do
+    sudo ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images import "$img"
+    check_command "Loading image: $img"
+  done
 
   # Using helm to install nginx-ingress-controller.
-  helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-  helm repo update
-  helm install nginx-ingress ingress-nginx/ingress-nginx --namespace nginx-ingress --create-namespace --values=values.yaml
+  helm install nginx-ingress /etc/pf9/ingress-nginx --namespace nginx-ingress --create-namespace 
   check_command "Installing NGINX Ingress Controller"
 
   # Wait for NGINX Ingress Controller to be ready
@@ -146,7 +139,7 @@ else
   log "K3S_TOKEN: $K3S_TOKEN"
 
   # Install K3s worker
-  curl -sfL https://get.k3s.io | K3S_URL=$K3S_URL K3S_TOKEN=$K3S_TOKEN INSTALL_K3S_VERSION=$K3S_VERSION sh -
+  K3S_URL=$K3S_URL K3S_TOKEN=$K3S_TOKEN INSTALL_K3S_SKIP_DOWNLOAD=true /etc/pf9/k3s-setup/k3s-install.sh
   check_command "Installing K3s worker"
 
   log "K3s worker setup completed."

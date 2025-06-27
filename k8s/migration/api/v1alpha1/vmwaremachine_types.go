@@ -36,8 +36,8 @@ type VMInfo struct {
 	IPAddress string `json:"ipAddress,omitempty"`
 	// VMState is the state of the virtual machine
 	VMState string `json:"vmState,omitempty"`
-	// OSType is the OS type of the virtual machine
-	OSType string `json:"osType,omitempty"`
+	// OSFamily is the OS family of the virtual machine
+	OSFamily string `json:"osFamily,omitempty"`
 	// CPU is the number of CPUs in the virtual machine
 	CPU int `json:"cpu,omitempty"`
 	// Memory is the amount of memory in the virtual machine
@@ -46,6 +46,8 @@ type VMInfo struct {
 	ESXiName string `json:"esxiName,omitempty"`
 	// ClusterName is the name of the cluster
 	ClusterName string `json:"clusterName,omitempty"`
+	// AssignedIp is the IP address assigned to the VM
+	AssignedIP string `json:"assignedIp,omitempty"`
 	// RDMDisks is the list of RDM disks for the virtual machine
 	RDMDisks []RDMDiskInfo `json:"rdmDisks,omitempty"`
 }
@@ -118,7 +120,7 @@ type RDMDiskInfo struct {
 	// DisplayName is the display name of the disk
 	DisplayName string `json:"displayName,omitempty"`
 	// OpenstackVolumeRef contains OpenStack volume reference information
-	OpenstackVolumeRef *OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
+	OpenstackVolumeRef OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
 }
 
 func init() {

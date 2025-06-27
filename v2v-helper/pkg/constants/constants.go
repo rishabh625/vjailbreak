@@ -41,4 +41,9 @@ systemctl enable --now serial-getty@ttyS0.service`
 	EventMessageMigrationFailed                   = "Trying to perform cleanup"
 	EventMessageCopyingDisk                       = "Copying disk"
 	EventMessageFailed                            = "Failed to"
+
+	OSFamilyWindows = "windowsguest"
+	OSFamilyLinux   = "linuxguest"
+
+	PCDClusterNameNoCluster = "NO CLUSTER"
 )

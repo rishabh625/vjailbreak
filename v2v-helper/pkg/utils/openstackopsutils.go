@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -69,9 +70,13 @@ func (osclient *OpenStackClients) CreateVolume(name string, size int64, ostype s
 
 	opts := volumes.CreateOpts{
 		VolumeType: volumetype,
-		Size:       int(float64(size) / (1024 * 1024 * 1024)),
+		Size:       int(math.Ceil(float64(size) / (1024 * 1024 * 1024))),
 		Name:       name,
 	}
+
+	// Add 1GB to the size to account for the extra space
+	opts.Size += 1
+
 	volume, err := volumes.Create(blockStorageClient, opts).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create volume: %s", err)
@@ -94,7 +99,7 @@ func (osclient *OpenStackClients) CreateVolume(name string, size int64, ostype s
 		}
 	}
 
-	if ostype == "windows" {
+	if strings.ToLower(ostype) == constants.OSFamilyWindows {
 		err = osclient.SetVolumeImageMetadata(volume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set volume image metadata: %s", err)
@@ -448,7 +453,7 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 		FlavorRef: flavor.ID,
 		Networks:  openstacknws,
 	}
-	if availabilityZone != "" {
+	if availabilityZone != "" && !strings.Contains(availabilityZone, constants.PCDClusterNameNoCluster) {
 		// for PCD, this will be set to cluster name
 		serverCreateOpts.AvailabilityZone = availabilityZone
 	}

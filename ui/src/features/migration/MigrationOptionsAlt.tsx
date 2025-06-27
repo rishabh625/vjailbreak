@@ -58,8 +58,9 @@ interface MigrationOptionsPropsInterface {
   onChange: (key: string) => (value: unknown) => void
   selectedMigrationOptions: SelectedMigrationOptionsType
   updateSelectedMigrationOptions: (
-    key: keyof SelectedMigrationOptionsType
-  ) => (value: unknown) => void
+  key: keyof SelectedMigrationOptionsType | "postMigrationAction.suffix" | "postMigrationAction.folderName"
+) => (value: unknown) => void
+
   errors: FieldErrors
   getErrorsUpdater: (key: string | number) => (value: string) => void
   stepNumber: string
@@ -86,7 +87,7 @@ export default function MigrationOptionsAlt({
   useEffect(() => {
     onChange("dataCopyMethod")("hot")
     onChange("cutoverOption")(CUTOVER_TYPES.IMMEDIATE)
-    onChange("osType")(OS_TYPES.AUTO_DETECT)
+    onChange("osFamily")(OS_TYPES.AUTO_DETECT)
   }, [])
 
   const getMinEndTime = useCallback(() => {
@@ -284,23 +285,23 @@ export default function MigrationOptionsAlt({
 
             <Fields>
               <FormControlLabel
-                id="os-type"
-                label="OS Type"
+                id="os-family"
+                label="OS Family"
                 control={
                   <Checkbox
-                    checked={selectedMigrationOptions.osType}
+                    checked={selectedMigrationOptions.osFamily}
                     onChange={(e) => {
-                      updateSelectedMigrationOptions("osType")(e.target.checked)
+                      updateSelectedMigrationOptions("osFamily")(e.target.checked)
                     }}
                   />
                 }
               />
               <Select
                 size="small"
-                disabled={!selectedMigrationOptions?.osType}
-                value={params?.osType || OS_TYPES.AUTO_DETECT}
+                disabled={!selectedMigrationOptions?.osFamily}
+                value={params?.osFamily || OS_TYPES.AUTO_DETECT}
                 onChange={(e) => {
-                  onChange("osType")(e.target.value)
+                  onChange("osFamily")(e.target.value)
                 }}
               >
                 {OS_TYPES_OPTIONS.map((item) => (
@@ -328,9 +329,89 @@ export default function MigrationOptionsAlt({
                 Select this option to retry the migration incase of failure
               </Typography>
             </Fields>
+<Fields>
+  <FormControlLabel
+    label="Rename VM"
+    control={
+      <Checkbox
+        checked={!!selectedMigrationOptions.postMigrationAction?.renameVm}
+        onChange={(e) => {
+          const isChecked = e.target.checked;
+          updateSelectedMigrationOptions("postMigrationAction")({
+            ...selectedMigrationOptions.postMigrationAction,
+            renameVm: isChecked,
+            suffix: isChecked ? true : selectedMigrationOptions.postMigrationAction?.suffix
+          });
+          onChange("postMigrationAction")({
+            ...params.postMigrationAction,
+            renameVm: isChecked,
+            suffix: isChecked ? (params.postMigrationAction?.suffix || "_migrated_to_pcd") : undefined
+          });
+        }}
+      />
+    }
+  />
+  <Select
+    size="small"
+    disabled={!selectedMigrationOptions.postMigrationAction?.renameVm}
+    value={params.postMigrationAction?.suffix || "_migrated_to_pcd"}
+    onChange={(e) => {
+      onChange("postMigrationAction")({
+        ...params.postMigrationAction,
+        suffix: e.target.value
+      });
+    }}
+  >
+    <MenuItem value="_migrated_to_pcd">_migrated_to_pcd</MenuItem>
+  </Select>
+  <Typography variant="caption">
+    Optional: This suffix will be appended to the source VM name after migration.
+  </Typography>
+</Fields>
 
-            {/* Pre and Post Web Hooks */}
-            {/* {PrePostWebHooksList.map((hook) => (
+<Fields>
+  <FormControlLabel
+    label="Move to Folder"
+    control={
+      <Checkbox
+        checked={!!selectedMigrationOptions.postMigrationAction?.moveToFolder}
+        onChange={(e) => {
+          const isChecked = e.target.checked;
+          updateSelectedMigrationOptions("postMigrationAction")({
+            ...selectedMigrationOptions.postMigrationAction,
+            moveToFolder: isChecked,
+            folderName: isChecked ? true : selectedMigrationOptions.postMigrationAction?.folderName
+          });
+          onChange("postMigrationAction")({
+            ...params.postMigrationAction,
+            moveToFolder: isChecked,
+            folderName: isChecked ? (params.postMigrationAction?.folderName || "vjailbreakedVMs") : undefined
+          });
+        }}
+      />
+    }
+  />
+  <Select
+    size="small"
+    disabled={!selectedMigrationOptions.postMigrationAction?.moveToFolder}
+    value={params.postMigrationAction?.folderName || "vjailbreakedVMs"}
+    onChange={(e) => {
+      onChange("postMigrationAction")({
+        ...params.postMigrationAction,
+        folderName: e.target.value
+      });
+    }}
+  >
+    <MenuItem value="vjailbreakedVMs">vjailbreakedVMs</MenuItem>
+  </Select>
+  <Typography variant="caption">
+    Optional: This folder name will be used to organize the migrated VMs in vCenter.
+  </Typography>
+</Fields>
+
+{/* 
+            Pre and Post Web Hooks 
+// ...
               <Fields key={`${hook.label}-${hook.identifier}`}>
                 <PrePostWebHooks
                   label={hook.label}

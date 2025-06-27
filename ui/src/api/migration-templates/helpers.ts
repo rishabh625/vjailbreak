@@ -6,10 +6,11 @@ export const createMigrationTemplateJson = (params) => {
     networkMapping = "",
     storageMapping = "",
     virtioWinDriver,
-    osType,
+    osFamily,
     datacenter,
     vmwareRef,
     openstackRef,
+    targetPCDClusterName,
   } = params || {}
   return {
     apiVersion: "vjailbreak.k8s.pf9.io/v1alpha1",
@@ -21,7 +22,7 @@ export const createMigrationTemplateJson = (params) => {
       networkMapping: networkMapping,
       storageMapping: storageMapping,
       virtioWinDriver: virtioWinDriver,
-      osType: osType,
+      osFamily: osFamily,
       source: {
         datacenter: datacenter,
         vmwareRef: vmwareRef,
@@ -29,6 +30,9 @@ export const createMigrationTemplateJson = (params) => {
       destination: {
         openstackRef: openstackRef,
       },
+      ...(targetPCDClusterName && {
+        targetPCDClusterName: targetPCDClusterName,
+      }),
     },
   }
 }

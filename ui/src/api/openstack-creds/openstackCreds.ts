@@ -79,3 +79,34 @@ export const createOpenstackCredsWithSecret = async (
 
   return response
 }
+
+// IP validation interfaces and function
+interface IPValidationRequest {
+  ip: string[]
+  accessInfo: {
+    authUrl: string
+    domainName: string
+    insecure: boolean
+    password: string
+    regionName: string
+    tenantName: string
+    username: string
+  }
+}
+
+interface IPValidationResponse {
+  isValid: boolean[]
+  reason: string[]
+}
+
+export const validateOpenstackIPs = async (
+  request: IPValidationRequest
+): Promise<IPValidationResponse> => {
+  const endpoint = "/dev-api/sdk/vpw/v1/validate_openstack_ip"
+  const response = await axios.post<IPValidationResponse>({
+    endpoint,
+    data: request,
+  })
+
+  return response
+}

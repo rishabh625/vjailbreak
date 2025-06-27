@@ -37,6 +37,7 @@ export interface MigrationTemplateSpec {
   networkMapping: string
   source: Source
   storageMapping: string
+  targetPCDClusterName?: string
 }
 
 export interface Destination {
@@ -70,6 +71,7 @@ export interface VmData {
   targetFlavorId?: string
   disks?: string[]
   labels?: { [key: string]: string }
+  vmWareMachineName?: string
 }
 export interface GetMigrationTemplatesMetadata {
   continue: string

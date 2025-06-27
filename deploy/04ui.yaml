@@ -17,7 +17,7 @@ spec:
       containers:
         - name: vjailbreak-ui-container
           image: platform9/vjailbreak-ui:v0.1
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
 ---

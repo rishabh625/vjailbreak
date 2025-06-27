@@ -19,13 +19,15 @@ VERSION = $(RELEASE_VER)-$(GIT_SHA)
 
 export REPO ?= platform9
 export TAG ?= $(VERSION)
-export UI_IMG ?= ${REPO}/vjailbreak-ui:${TAG}
-export V2V_IMG ?= ${REPO}/v2v-helper:${TAG}
-export CONTROLLER_IMG ?= ${REPO}/vjailbreak-controller:${TAG}
-export VPWNED_IMG ?= ${REPO}/vjailbreak-vpwned:${TAG}
+export UI_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-ui:${TAG}
+export V2V_IMG ?= ${REGISTRY}/${REPO}/v2v-helper:${TAG}
+export CONTROLLER_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-controller:${TAG}
+export VPWNED_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-vpwned:${TAG}
 export RELEASE_VERSION ?= $(VERSION)
 export KUBECONFIG ?= ~/.kube/config
 export CONTAINER_TOOL ?= docker
+export REGISTRY ?= quay.io
+
 
 .PHONY: ui
 ui:
@@ -54,8 +56,9 @@ vjail-controller-only:
 generate-manifests: vjail-controller ui
 	rm -rf image_builder/deploy && mkdir image_builder/deploy
 	envsubst < ui/deploy/ui.yaml > image_builder/deploy/01ui.yaml
+	envsubst < image_builder/configs/version-config.yaml > image_builder/deploy/version-config.yaml
 	make -C k8s/migration/ build-installer && cp k8s/migration/dist/install.yaml image_builder/deploy/00controller.yaml
-
+	
 .PHONY: build-vpwned
 build-vpwned:
 	make -C pkg/vpwned docker-build docker-push

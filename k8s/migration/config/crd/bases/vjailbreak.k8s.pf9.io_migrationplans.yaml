@@ -107,6 +107,19 @@ spec:
                 description: MigrationTemplate is the template to be used for the
                   migration
                 type: string
+              postMigrationAction:
+                description: PostMigrationAction defines the post migration action
+                  for the virtual machine
+                properties:
+                  folderName:
+                    type: string
+                  moveToFolder:
+                    type: boolean
+                  renameVm:
+                    type: boolean
+                  suffix:
+                    type: string
+                type: object
               retry:
                 description: Retry the migration if it fails
                 type: boolean

@@ -104,7 +104,7 @@ Your admin.rc file should atleast contain the following keys: OS_AUTH_URL, OS_DO
 		configMap.Metadata.Name = "migration-config"
 		configMap.Data = make(map[string]string)
 
-		envVars := []string{"VCENTER_USERNAME", "VCENTER_PASSWORD", "VCENTER_HOST", "SOURCE_VM_NAME", "CONVERT", "VCENTER_INSECURE", "NEUTRON_NETWORK_NAMES", "OS_TYPE", "VIRTIO_WIN_DRIVER"}
+		envVars := []string{"VCENTER_USERNAME", "VCENTER_PASSWORD", "VCENTER_HOST", "SOURCE_VM_NAME", "CONVERT", "VCENTER_INSECURE", "NEUTRON_NETWORK_NAMES", "OS_FAMILY", "VIRTIO_WIN_DRIVER"}
 		for _, env := range envVars {
 			var value string
 			switch env {
@@ -154,7 +154,7 @@ Your admin.rc file should atleast contain the following keys: OS_AUTH_URL, OS_DO
 					fmt.Scanln(&value)
 					value = readBool(value)
 				}
-			case "OS_TYPE":
+			case "OS_FAMILY":
 				if os_type, _ := cmd.Flags().GetString("os-type"); os_type != "" {
 					value = os_type
 				} else {

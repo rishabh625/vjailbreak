@@ -26,22 +26,26 @@ export const getVMwareMachines = async (
 }
 
 /**
- * Update a VMware machine's target flavor ID
+ * Update a VMware machine's properties
  * @param vmName - The name of the VM to update
- * @param flavorId - The ID of the flavor to assign
+ * @param payload - The payload containing fields to update
  * @param namespace - The namespace of the VM (defaults to migration-system)
  */
 export const patchVMwareMachine = async (
   vmName: string,
-  flavorId: string,
+  payload: {
+    spec?: {
+      targetFlavorId?: string
+      vms?: {
+        assignedIp?: string
+        osFamily?: string
+      }
+    }
+  },
   namespace = VJAILBREAK_DEFAULT_NAMESPACE
 ): Promise<VMwareMachine> => {
+  
   const endpoint = `${VJAILBREAK_API_BASE_PATH}/namespaces/${namespace}/vmwaremachines/${vmName}`
-  const payload = {
-    spec: {
-      targetFlavorId: flavorId,
-    },
-  }
 
   return axios.patch<VMwareMachine>({
     endpoint,
@@ -53,6 +57,7 @@ export const patchVMwareMachine = async (
     },
   })
 }
+
 export const mapToVmData = (machines: VMwareMachine[]): VmData[] => {
   return machines.map((machine) => ({
     name: machine.spec.vms.name,
@@ -66,8 +71,20 @@ export const mapToVmData = (machines: VMwareMachine[]): VmData[] => {
     disks: machine.spec.vms.disks || [],
     targetFlavorId: machine.spec.targetFlavorId,
     labels: machine.metadata.labels,
-    osType: machine.spec.vms.osType,
-    esxHost:
-      machine.metadata?.labels?.[`vjailbreak.k8s.pf9.io/esxi-name`] || "",
+    osFamily: machine.spec.vms.osFamily,
+    esxHost: machine.metadata?.labels?.[`vjailbreak.k8s.pf9.io/esxi-name`] || "",
+    vmWareMachineName: machine.metadata.name,
+
   }))
+}
+
+export const getVMwareMachine = async (
+  vmName: string,
+  namespace = VJAILBREAK_DEFAULT_NAMESPACE
+): Promise<VMwareMachine> => {
+  const endpoint = `${VJAILBREAK_API_BASE_PATH}/namespaces/${namespace}/vmwaremachines/${vmName}`
+
+  return axios.get<VMwareMachine>({
+    endpoint,
+  })
 }

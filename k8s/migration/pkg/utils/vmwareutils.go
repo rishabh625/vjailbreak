@@ -202,11 +202,11 @@ func DeleteStaleVMwareClustersAndHosts(ctx context.Context, k3sclient client.Cli
 		hosts = append(hosts, cluster.Hosts...)
 	}
 	existingClusters := vjailbreakv1alpha1.VMwareClusterList{}
-	if err := k3sclient.List(ctx, &existingClusters); err != nil {
+	if err := k3sclient.List(ctx, &existingClusters, client.MatchingLabels{constants.VMwareCredsLabel: scope.Name()}); err != nil {
 		return errors.Wrap(err, "failed to list vmware clusters")
 	}
 	existingHosts := vjailbreakv1alpha1.VMwareHostList{}
-	if err := k3sclient.List(ctx, &existingHosts); err != nil {
+	if err := k3sclient.List(ctx, &existingHosts, client.MatchingLabels{constants.VMwareCredsLabel: scope.Name()}); err != nil {
 		return errors.Wrap(err, "failed to list vmware hosts")
 	}
 	// Create a map of valid cluster names for O(1) lookups

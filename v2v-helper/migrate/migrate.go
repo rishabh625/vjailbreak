@@ -55,6 +55,7 @@ type Migrate struct {
 	K8sClient              client.Client
 	TargetFlavorId         string
 	TargetAvailabilityZone string
+	AssignedIP             string
 }
 
 type MigrationTimes struct {
@@ -231,20 +232,27 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		}
 	}
 
+	// clean up snapshots
+	utils.PrintLog("Cleaning up snapshots before copy")
+	err := vmops.CleanUpSnapshots(false)
+	if err != nil {
+		return vminfo, fmt.Errorf("failed to clean up snapshots: %s, please delete manually before starting again", err)
+	}
+
 	utils.PrintLog("Starting NBD server")
-	err := vmops.TakeSnapshot(constants.MigrationSnapshotName)
+	err = vmops.TakeSnapshot(constants.MigrationSnapshotName)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to take snapshot of source VM: %s", err)
 	}
 
-	vminfo, err = vmops.UpdateDiskInfo(vminfo)
+	err = vmops.UpdateDisksInfo(&vminfo)
 	if err != nil {
 		return vminfo, fmt.Errorf("failed to update disk info: %s", err)
 	}
 
 	for idx, vmdisk := range vminfo.VMDisks {
 		migobj.logMessage(fmt.Sprintf("Copying disk %d, Completed: 0%%", idx))
-		err := nbdops[idx].StartNBDServer(vmops.GetVMObj(), envURL, envUserName, envPassword, thumbprint, vmdisk.Snapname, vmdisk.SnapBackingDisk, migobj.EventReporter)
+		err = nbdops[idx].StartNBDServer(vmops.GetVMObj(), envURL, envUserName, envPassword, thumbprint, vmdisk.Snapname, vmdisk.SnapBackingDisk, migobj.EventReporter)
 		if err != nil {
 			return vminfo, fmt.Errorf("failed to start NBD server: %s", err)
 		}
@@ -306,11 +314,21 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 
 					// 11. Copy Changed Blocks over
 					done = false
+					changedBlockCopySuccess := true
 					migobj.logMessage("Copying changed blocks")
 
 					err = nbdops[idx].CopyChangedBlocks(ctx, changedAreas, vminfo.VMDisks[idx].Path)
 					if err != nil {
-						return vminfo, fmt.Errorf("failed to copy changed blocks: %s", err)
+						changedBlockCopySuccess = false
+					}
+
+					err = vmops.UpdateDiskInfo(&vminfo, vminfo.VMDisks[idx], changedBlockCopySuccess)
+					if err != nil {
+						return vminfo, fmt.Errorf("failed to update disk info: %s", err)
+					}
+					if !changedBlockCopySuccess {
+						migobj.logMessage(fmt.Sprintf("Failed to copy changed blocks: %s", err))
+						migobj.logMessage(fmt.Sprintf("Since full copy has completed, Retrying copy of changed block	s for disk: %d", idx))
 					}
 					migobj.logMessage("Finished copying changed blocks")
 					migobj.logMessage(fmt.Sprintf("Syncing Changed blocks [%d/20]", incrementalCopyCount))
@@ -339,11 +357,8 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 		// Update old change id to the new base change id value
 		// Only do this after you have gone through all disks with old change id.
 		// If you dont, only your first disk will have the updated changes
-		vminfo, err = vmops.UpdateDiskInfo(vminfo)
-		if err != nil {
-			return vminfo, fmt.Errorf("failed to update disk info: %s", err)
-		}
-		err = vmops.DeleteSnapshot(constants.MigrationSnapshotName)
+
+		err = vmops.CleanUpSnapshots(false)
 		if err != nil {
 			return vminfo, fmt.Errorf("failed to delete snapshot of source VM: %s", err)
 		}
@@ -370,7 +385,7 @@ func (migobj *Migrate) LiveReplicateDisks(ctx context.Context, vminfo vm.VMInfo)
 	}
 
 	utils.PrintLog("Deleting migration snapshot")
-	err = vmops.DeleteSnapshot(constants.MigrationSnapshotName)
+	err = vmops.CleanUpSnapshots(true)
 	if err != nil {
 		migobj.logMessage(fmt.Sprintf(`Failed to delete snapshot of source VM: %s, since copy is completed, 
 		continuing with the migration`, err))
@@ -389,9 +404,9 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		useSingleDisk               bool
 	)
 
-	if vminfo.OSType == "windows" {
+	if strings.ToLower(vminfo.OSType) == constants.OSFamilyWindows {
 		getBootCommand = "ls /Windows"
-	} else if vminfo.OSType == "linux" {
+	} else if strings.ToLower(vminfo.OSType) == constants.OSFamilyLinux {
 		getBootCommand = "ls /boot"
 	} else {
 		getBootCommand = "inspect-os"
@@ -431,7 +446,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		break
 	}
 
-	if vminfo.OSType == "linux" {
+	if strings.ToLower(vminfo.OSType) == constants.OSFamilyLinux {
 		if useSingleDisk {
 			// skip checking LVM, because its a single disk
 			osRelease, err = virtv2v.GetOsRelease(vminfo.VMDisks[bootVolumeIndex].Path)
@@ -452,7 +467,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 			}
 			osRelease, err = virtv2v.RunCommandInGuestAllVolumes(vminfo.VMDisks, "cat", false, "/etc/os-release")
 			if err != nil {
-				return fmt.Errorf("failed to get os release: %s", err)
+				return fmt.Errorf("failed to get os release: %s: %s\n", err, strings.TrimSpace(osRelease))
 			}
 		}
 		osDetected := strings.ToLower(strings.TrimSpace(osRelease))
@@ -486,7 +501,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		}
 		utils.PrintLog("OS compatibility check passed")
 
-	} else if vminfo.OSType == "windows" {
+	} else if strings.ToLower(vminfo.OSType) == constants.OSFamilyWindows {
 		utils.PrintLog("OS compatibility check passed")
 	} else {
 		return fmt.Errorf("unsupported OS type: %s", vminfo.OSType)
@@ -498,14 +513,14 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	if migobj.Convert {
 		firstbootscripts := []string{}
 		// Fix NTFS
-		if vminfo.OSType == "windows" {
+		if strings.ToLower(vminfo.OSType) == constants.OSFamilyWindows {
 			err = virtv2v.NTFSFix(vminfo.VMDisks[bootVolumeIndex].Path)
 			if err != nil {
 				return fmt.Errorf("failed to run ntfsfix: %s", err)
 			}
 		}
 		// Turn on DHCP for interfaces in rhel VMs
-		if vminfo.OSType == "linux" {
+		if strings.ToLower(vminfo.OSType) == constants.OSFamilyLinux {
 			if strings.Contains(osRelease, "rhel") {
 				firstbootscriptname := "rhel_enable_dhcp"
 				firstbootscript := constants.RhelFirstBootScript
@@ -530,7 +545,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	}
 
 	//TODO(omkar): can disable DHCP here
-	if vminfo.OSType == "linux" {
+	if strings.ToLower(vminfo.OSType) == constants.OSFamilyLinux {
 		if strings.Contains(osRelease, "ubuntu") {
 			// Add Wildcard Netplan
 			utils.PrintLog("Adding wildcard netplan")
@@ -604,6 +619,10 @@ func (migobj *Migrate) CreateTargetInstance(vminfo vm.VMInfo) error {
 				ip = ""
 			} else {
 				ip = vminfo.IPs[idx]
+			}
+
+			if migobj.AssignedIP != "" {
+				ip = migobj.AssignedIP
 			}
 			port, err := openstackops.CreatePort(network, vminfo.Mac[idx], ip, vminfo.Name)
 			if err != nil {
@@ -794,10 +813,10 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		return errors.Wrap(err, "failed to get all info")
 	}
 	if len(vminfo.VMDisks) != len(migobj.Volumetypes) {
-		return errors.Errorf("number of volume types does not match number of disks")
+		return fmt.Errorf("number of volume types does not match number of disks vm(%d) volume(%d)", len(vminfo.VMDisks), len(migobj.Volumetypes))
 	}
 	if len(vminfo.Mac) != len(migobj.Networknames) {
-		return errors.Errorf("number of mac addresses does not match number of network names")
+		return fmt.Errorf("number of mac addresses does not match number of network names mac(%d) network(%d)", len(vminfo.Mac), len(migobj.Networknames))
 	}
 	// Graceful Termination clean-up volumes and snapshots
 	go migobj.gracefulTerminate(vminfo, cancel)
@@ -869,7 +888,7 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 	if err != nil {
 		utils.PrintLog(fmt.Sprintf("Failed to delete all volumes from host: %s\n", err))
 	}
-	err = migobj.VMops.DeleteSnapshot(constants.MigrationSnapshotName)
+	err = migobj.VMops.CleanUpSnapshots(true)
 	if err != nil {
 		utils.PrintLog(fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))
 		return errors.Wrap(err, fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))

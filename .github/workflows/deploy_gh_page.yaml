@@ -1,11 +1,11 @@
-name: Build & Deploy vJailbreak Docs + Swagger UI
+name: Deploy Docs & API Documentation
 
 
 on:
   # Trigger the workflow every time you push to the `main` branch
   # Using a different branch name? Replace `main` with your branch’s name
   push:
-    branches: [ main ]
+    branches: [ gh-pages ]
     tags:
       - 'v*'
   # Allows you to run this workflow manually from the Actions tab on GitHub.
@@ -14,7 +14,7 @@ on:
         branch:
           description: 'Branch to use'
           required: true
-          default: 'main'
+          default: 'gh-pages'
 # Allow this job to clone the repo and create a page deployment
 permissions:
   contents: write

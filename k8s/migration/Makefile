@@ -1,8 +1,6 @@
-# Image URL to use all building/pushing image targets
-
 REPO ?= platform9
 REGISTRY ?= quay.io
-TAG ?= 1.0.4
+TAG ?= 0.1.13
 
 export CONTROLLER_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-controller:${TAG}
 export V2V_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-v2v:${TAG}
