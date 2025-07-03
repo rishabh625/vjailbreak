@@ -1,0 +1,152 @@
+```yaml
+# This sample demonstrates how to configure SharedRDM resources for migrating
+# VMware Raw Device Mapping (RDM) disks that are shared across multiple VMs.
+# SharedRDM resources manage the lifecycle of shared storage volumes during migration.
+
+---
+# Basic SharedRDM Example
+# This example shows a simple shared RDM configuration with standard settings
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: SharedRDM
+metadata:
+  name: shared-rdm-basic
+  namespace: vjailbreak-system
+  labels:
+    app.kubernetes.io/name: vjailbreak
+    app.kubernetes.io/component: shared-rdm
+spec:
+  # sourceUUID: The VMware LUN UUID that uniquely identifies the shared RDM disk
+  # This UUID can be found in VMware vSphere by examining the VM's disk configuration
+  # Format: Standard UUID format (8-4-4-4-12 hexadecimal digits)
+  sourceUUID: "6000c29f-4cb8-4b9d-8c7e-1234567890ab"
+  
+  # displayName: Human-readable name for the shared RDM resource
+  # Used in UI displays and logging for easier identification
+  displayName: "Shared Database Storage"
+  
+  # diskSize: Size of the RDM disk in bytes
+  # Must match the actual size of the VMware RDM LUN
+  # Example: 107374182400 = 100GB (100 * 1024^3)
+  diskSize: 107374182400
+  
+  # vmwareRefs: List of VMware VM names that currently use this shared RDM
+  # These VMs will be migrated to use the corresponding OpenStack volume
+  # VM names should match the names in VMware vCenter
+  vmwareRefs:
+    - "database-vm-1"
+    - "database-vm-2"
+  
+  # migrationStrategy: Strategy for migrating the RDM data
+  # Valid values:
+  #   - "copy": Copy data from VMware RDM to new OpenStack volume (default)
+  #   - "reuse": Reuse existing OpenStack volume (if available)
+  #   - "manual": Manual migration - create volume but don't copy data
+  migrationStrategy: "copy"
+  
+  # cinderBackendPool: Target Cinder backend pool for the new volume
+  # Should be configured in your OpenStack environment
+  # Leave empty to use the default pool
+  cinderBackendPool: "default"
+  
+  # volumeType: OpenStack volume type for the new volume
+  # Must support multi-attach for shared RDM scenarios
+  # Check with your OpenStack administrator for available types
+  volumeType: "standard"
+
+---
+# Advanced SharedRDM Example
+# This example shows a complex shared RDM configuration with custom settings
+# for high-performance storage requirements
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: SharedRDM
+metadata:
+  name: shared-rdm-advanced
+  namespace: vjailbreak-system
+  labels:
+    app.kubernetes.io/name: vjailbreak
+    app.kubernetes.io/component: shared-rdm
+    environment: production
+    storage-tier: high-performance
+  annotations:
+    # Custom annotations for tracking and management
+    vjailbreak.k8s.pf9.io/original-datastore: "vmware-datastore-01"
+    vjailbreak.k8s.pf9.io/migration-priority: "high"
+    vjailbreak.k8s.pf9.io/backup-required: "true"
+spec:
+  # Advanced configuration for high-performance shared storage
+  sourceUUID: "6000c29a-8ef2-4d1c-9b7f-9876543210cd"
+  displayName: "High-Performance Shared Oracle Storage"
+  
+  # Large disk size for enterprise database workloads
+  # 2TB = 2199023255552 bytes (2 * 1024^4)
+  diskSize: 2199023255552
+  
+  # Multiple VMs sharing the same RDM for clustered database setup
+  vmwareRefs:
+    - "oracle-rac-node-1"
+    - "oracle-rac-node-2"
+    - "oracle-rac-node-3"
+  
+  # Copy strategy with data validation
+  migrationStrategy: "copy"
+  
+  # High-performance SSD backend pool
+  # Ensure this pool exists in your OpenStack Cinder configuration
+  cinderBackendPool: "ssd-nvme-pool"
+  
+  # High-performance volume type with multi-attach support
+  # This volume type must be configured in OpenStack to support:
+  # - Multi-attach capability for shared access
+  # - High IOPS and throughput for database workloads
+  # - Appropriate replication and availability settings
+  volumeType: "high-performance-multiattach"
+  
+  # Optional: OpenStack volume reference (if reusing existing volume)
+  # Uncomment and configure if using "reuse" migration strategy
+  # openstackVolumeRef:
+  #   volumeID: "existing-volume-uuid"
+  #   projectID: "target-project-id"
+  #   region: "RegionOne"
+
+---
+# Example for Manual Migration Strategy
+# This example shows configuration for manual data migration scenarios
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: SharedRDM
+metadata:
+  name: shared-rdm-manual
+  namespace: vjailbreak-system
+  labels:
+    app.kubernetes.io/name: vjailbreak
+    app.kubernetes.io/component: shared-rdm
+  annotations:
+    vjailbreak.k8s.pf9.io/migration-notes: "Manual migration required due to custom encryption"
+spec:
+  sourceUUID: "6000c29b-1234-5678-9abc-def012345678"
+  displayName: "Encrypted Shared Storage (Manual Migration)"
+  diskSize: 536870912000  # 500GB
+  
+  vmwareRefs:
+    - "secure-app-vm-1"
+    - "secure-app-vm-2"
+  
+  # Manual strategy: Create volume but don't copy data automatically
+  # Use this when:
+  # - Custom data migration tools are required
+  # - Data encryption/decryption is needed
+  # - Special data transformation is required
+  migrationStrategy: "manual"
+  
+  cinderBackendPool: "encrypted-pool"
+  volumeType: "encrypted-multiattach"
+
+# Configuration Best Practices:
+#
+# 1. Volume Type Selection:
+#    - Ensure the volume type supports multi-attach for shared RDM
+#    - Choose appropriate performance characteristics (IOPS, throughput)
+#    - Consider data protection requirements (replication, backup)
+#
+# 2. Backend Pool Configuration:
+#    - Use dedicated pools for different performance tiers
+#    - Ensure sufficient capacity in the target pool

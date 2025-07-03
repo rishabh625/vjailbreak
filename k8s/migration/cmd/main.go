@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package main is the entry point for the migration controller
 package main
 
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -33,14 +31,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	utils "github.com/platform9/vjailbreak/k8s/migration/pkg/utils"
-
-	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
-	"github.com/platform9/vjailbreak/k8s/migration/internal/controller"
-	// +kubebuilder:scaffold:imports
+	vjailbreakv1alpha1 "github.com/vjailbreak/k8s/migration/api/v1alpha1"
+	"github.com/vjailbreak/k8s/migration/internal/controller"
+	//+kubebuilder:scaffold:imports
 )
 
 var (
@@ -50,15 +46,19 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	// Register vjailbreak API types
 	utilruntime.Must(vjailbreakv1alpha1.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
+	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr, probeAddr string
-	var secureMetrics, enableLeaderElection, enableHTTP2, local bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. "+
-		"Use the port :8080. If not set, it will be 0 in order to disable the metrics server")
+	var metricsAddr string
+	var enableLeaderElection bool
+	var probeAddr string
+	var secureMetrics bool
+	var enableHTTP2 bool
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -67,8 +67,6 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&local, "local", false,
-		"If set, the controller manager will run in local mode")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -97,93 +95,9 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	// create manager
-	mgr, err := GetManager(metricsAddr, secureMetrics, tlsOpts, webhookServer, probeAddr, enableLeaderElection)
-	if err != nil {
-		setupLog.Error(err, "unable to set up overall controller manager")
-		os.Exit(1)
-	}
-
-	if err = SetupControllers(mgr, local); err != nil {
-		setupLog.Error(err, "unable to set up controllers")
-		os.Exit(1)
-	}
-
-	if err = (&controller.ESXIMigrationReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ESXIMigration")
-		os.Exit(1)
-	}
-	if err = (&controller.ClusterMigrationReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterMigration")
-		os.Exit(1)
-	}
-	if err = (&controller.BMConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BMConfig")
-		os.Exit(1)
-	}
-	// +kubebuilder:scaffold:builder
-
-	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
-	}
-
-	// handleStartupError logs the error and exits
-	handleStartupError := func(err error, msg string) {
-		setupLog.Error(err, msg)
-		// Since we're in a separate function, os.Exit won't prevent defers from running
-		os.Exit(1)
-	}
-
-	// Create a single ctx from signal handler to be reused
-	ctx := ctrl.SetupSignalHandler()
-
-	setupLog.Info("starting manager")
-	// Start the manager's cache first
-	go func() {
-		if err = mgr.Start(ctx); err != nil {
-			setupLog.Error(err, "problem running manager")
-			os.Exit(1)
-		}
-	}()
-
-	// Wait for cache to sync before using the client
-	if ok := mgr.GetCache().WaitForCacheSync(ctx); !ok {
-		handleStartupError(fmt.Errorf("failed to wait for caches to sync"), "Failed to sync cache")
-	}
-
-	// Now that cache is synced, we can create master node entry
-	if err = utils.CheckAndCreateMasterNodeEntry(ctx, mgr.GetClient(), local); err != nil {
-		handleStartupError(err, "Problem creating master node entry")
-	}
-
-	// Block forever
-	select {}
-}
-
-// GetManager creates and configures a controller manager with the specified options
-func GetManager(metricsAddr string,
-	secureMetrics bool,
-	tlsOpts []func(*tls.Config),
-	webhookServer webhook.Server,
-	probeAddr string,
-	enableLeaderElection bool) (ctrl.Manager, error) {
-	return ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
-		Metrics: metricsserver.Options{
+		Metrics: server.Options{
 			BindAddress:   metricsAddr,
 			SecureServing: secureMetrics,
 			TLSOpts:       tlsOpts,
@@ -191,80 +105,63 @@ func GetManager(metricsAddr string,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "9cf7a6b4.k8s.pf9.io",
+		LeaderElectionID:       "vjailbreak-migration-controller-manager",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
 	})
-}
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
 
-// SetupControllers initializes and sets up all controllers with the manager
-func SetupControllers(mgr ctrl.Manager, local bool) error {
-	if err := (&controller.MigrationReconciler{
+	// Setup Migration controller
+	if err = (&controller.MigrationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Migration")
-		return err
-	}
-	if err := (&controller.OpenstackCredsReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "OpenstackCreds")
-		return err
-	}
-	if err := (&controller.VMwareCredsReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VMwareCreds")
-		return err
-	}
-	if err := (&controller.StorageMappingReconciler{
-		BaseReconciler: controller.BaseReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StorageMapping")
-		return err
-	}
-	if err := (&controller.NetworkMappingReconciler{
-		BaseReconciler: controller.BaseReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NetworkMapping")
-		return err
-	}
-	if err := (&controller.MigrationPlanReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MigrationPlan")
-		return err
-	}
-	if err := (&controller.MigrationTemplateReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MigrationTemplate")
-		return err
-	}
-	if err := (&controller.VjailbreakNodeReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Local:  local,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VjailbreakNode")
-		return err
-	}
-	if err := (&controller.RollingMigrationPlanReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RollingMigrationPlan")
-		return err
+		os.Exit(1)
 	}
 
-	return nil
+	// Setup StorageMapping controller
+	if err = (&controller.StorageMappingReconciler{}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "StorageMapping")
+		os.Exit(1)
+	}
+
+	// Setup SharedRDM controller
+	if err = (&controller.SharedRDMReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SharedRDM")
+		os.Exit(1)
+	}
+	setupLog.Info("SharedRDM controller registered successfully")
+
+	//+kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
 }
