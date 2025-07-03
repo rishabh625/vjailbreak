@@ -1,0 +1,9 @@
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: RdmDisk
+metadata:
+  labels:
+    app.kubernetes.io/name: migration
+    app.kubernetes.io/managed-by: kustomize
+  name: rdmdisk-sample
+spec:
+  # TODO(user): Add fields here

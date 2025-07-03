@@ -17,4 +17,5 @@ resources:
 - vjailbreak_v1alpha1_bmconfig.yaml
 - vjailbreak_v1alpha1_pcdcluster.yaml
 - vjailbreak_v1alpha1_pcdhost.yaml
+- vjailbreak_v1alpha1_rdmdisk.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

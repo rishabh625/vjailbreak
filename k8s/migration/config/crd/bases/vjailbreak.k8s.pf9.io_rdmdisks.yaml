@@ -1,0 +1,104 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: rdmdisks.vjailbreak.k8s.pf9.io
+spec:
+  group: vjailbreak.k8s.pf9.io
+  names:
+    kind: RdmDisk
+    listKind: RdmDiskList
+    plural: rdmdisks
+    singular: rdmdisk
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RdmDisk is the Schema for the rdmdisks API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RdmDiskSpec defines the desired state of RdmDisk.
+            properties:
+              cinderReference:
+                type: string
+              diskName:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                type: string
+              diskSize:
+                type: integer
+              displayName:
+                type: string
+              ownerVMs:
+                items:
+                  type: string
+                type: array
+              uuid:
+                type: string
+              volumeRef:
+                properties:
+                  cinderBackendPool:
+                    type: string
+                  source:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  volumeType:
+                    type: string
+                required:
+                - cinderBackendPool
+                - source
+                - volumeType
+                type: object
+            required:
+            - cinderReference
+            - diskName
+            - diskSize
+            - displayName
+            - ownerVMs
+            - uuid
+            - volumeRef
+            type: object
+          status:
+            description: RdmDiskStatus defines the observed state of RdmDisk.
+            properties:
+              error:
+                type: string
+              phase:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                enum:
+                - Pending
+                - Managed
+                - Error
+                type: string
+              validated:
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
