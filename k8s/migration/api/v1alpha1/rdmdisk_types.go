@@ -27,23 +27,21 @@ import (
 type RdmDiskSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	DiskName        string        `json:"diskName"`
-	DiskSize        int           `json:"diskSize"`
-	UUID            string        `json:"uuid"`
-	DisplayName     string        `json:"displayName"`
-	OwnerVMs        []string      `json:"ownerVMs"`
-	VolumeRef       VolumeRefInfo `json:"volumeRef"`
-	CinderReference string        `json:"cinderReference"`
+	DiskName       string        `json:"diskName"`
+	DiskSize       int           `json:"diskSize"`
+	UUID           string        `json:"uuid"`
+	DisplayName    string        `json:"displayName"`
+	OwnerVMs       []string      `json:"ownerVMs"`
+	VolumeRef      VolumeRefInfo `json:"volumeRef"`
+	ImportToCinder bool          `json:"importToCinder,omitempty"` // Indicates if the RDM disk is being imported
 }
 
 // RdmDiskStatus defines the observed state of RdmDisk.
 type RdmDiskStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// +kubebuilder:validation:Enum=Pending;Managed;Error
-	Phase     string `json:"phase,omitempty"` // Pending | Managed | Error
-	Validated bool   `json:"validated,omitempty"`
-	Error     string `json:"error,omitempty"` // Error message if any
+	// +kubebuilder:validation:Enum=Created;Migrate;Managing;Managed;Error
+	Phase          string             `json:"phase,omitempty"` // Created | Migrate | Managing | Managed | Error
+	CinderVolumeID string             `json:"cinderVolumeID,omitempty"`
+	Conditions     []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -55,7 +53,7 @@ type RdmDiskStatus struct {
 type RdmDisk struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-
+	// Spec defines the desired state of RdmDisk
 	Spec   RdmDiskSpec   `json:"spec,omitempty"`
 	Status RdmDiskStatus `json:"status,omitempty"`
 }

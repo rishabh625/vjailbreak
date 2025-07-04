@@ -848,15 +848,18 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		}
 		return errors.Wrap(err, "failed to live replicate disks")
 	}
-	// Import LUN and MigrateRDM disk
-	for idx, rdmDisk := range vminfo.RDMDisks {
-		volumeID, err := migobj.cinderManage(rdmDisk)
-		if err != nil {
-			migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
-			return errors.Wrap(err, "failed to import LUN")
+	/*
+		// Todo in rdm controller and introduce reque logic
+		// Import LUN and MigrateRDM disk
+		for idx, rdmDisk := range vminfo.RDMDisks {
+			volumeID, err := migobj.cinderManage(rdmDisk)
+			if err != nil {
+				migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
+				return errors.Wrap(err, "failed to import LUN")
+			}
+			vminfo.RDMDisks[idx].VolumeId = volumeID
 		}
-		vminfo.RDMDisks[idx].VolumeId = volumeID
-	}
+	*/
 	// Convert the Boot Disk to raw format
 	err = migobj.ConvertVolumes(ctx, vminfo)
 	if err != nil {
@@ -917,7 +920,7 @@ func getVolumeID(d interface{}) (string, error) {
 }
 
 // cinderManage imports a LUN into OpenStack Cinder and returns the volume ID.
-func (migobj *Migrate) cinderManage(rdmDisk vm.RDMDisk) (string, error) {
+func (migobj *Migrate) CinderManage(rdmDisk vm.RDMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
 	migobj.logMessage(fmt.Sprintf("Importing LUN: %s", rdmDisk.DiskName))
 	volume, err := openstackops.CinderManage(rdmDisk)
