@@ -97,10 +97,10 @@ func (migobj *Migrate) CreateVolumes(vminfo vm.VMInfo) (vm.VMInfo, error) {
 func (migobj *Migrate) AttachVolume(disk vm.VMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
 	migobj.logMessage("Attaching volumes to VM")
-	volumeID, err := getVolumeID(disk)
-	if err != nil {
-		return "", fmt.Errorf("failed to get volume ID: %s", err)
+	if disk.OpenstackVol == nil {
+		return "", fmt.Errorf("OpenStack volume is nil")
 	}
+	volumeID := disk.OpenstackVol.ID
 	if err := openstackops.AttachVolumeToVM(volumeID); err != nil {
 		return "", errors.Wrap(err, "failed to attach volume to VM")
 	}
@@ -979,25 +979,6 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 		return errors.Wrap(err, fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))
 	}
 	return nil
-}
-
-// getVolumeID retrieves the volume ID from the disk object, by type asserting passed object.
-func getVolumeID(d interface{}) (string, error) {
-	if d == nil {
-		return "", fmt.Errorf("disk is nil")
-	}
-
-	switch disk := d.(type) {
-	case vm.VMDisk:
-		if disk.OpenstackVol == nil {
-			return "", fmt.Errorf("OpenStack volume is nil")
-		}
-		return disk.OpenstackVol.ID, nil
-	case string:
-		return disk, nil
-	default:
-		return "", fmt.Errorf("unsupported type: %T", d)
-	}
 }
 
 // cinderManage imports a LUN into OpenStack Cinder and returns the volume ID.
