@@ -50,13 +50,7 @@ spec:
                 type: string
               importToCinder:
                 type: boolean
-              ownerVMs:
-                items:
-                  type: string
-                type: array
-              uuid:
-                type: string
-              volumeRef:
+              openstackVolumeRef:
                 properties:
                   cinderBackendPool:
                     type: string
@@ -71,13 +65,19 @@ spec:
                 - source
                 - volumeType
                 type: object
+              ownerVMs:
+                items:
+                  type: string
+                type: array
+              uuid:
+                type: string
             required:
             - diskName
             - diskSize
             - displayName
+            - openstackVolumeRef
             - ownerVMs
             - uuid
-            - volumeRef
             type: object
           status:
             description: RdmDiskStatus defines the observed state of RdmDisk.

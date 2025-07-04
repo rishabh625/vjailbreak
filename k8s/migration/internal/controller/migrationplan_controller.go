@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"reflect"
@@ -385,6 +386,25 @@ func (r *MigrationPlanReconciler) ReconcileMigrationPlanJob(ctx context.Context,
 			if strings.Contains(err.Error(), "VDDK_MISSING") {
 				r.ctxlog.Info("Requeuing due to missing VDDK files.")
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			}
+			if reflect.DeepEqual(err, utils.ErrRDMDiskNotMigrated) {
+				retries := migrationplan.Status.RetryCount
+				if retries >= 5 {
+					r.ctxlog.Info("RDM disk not migrated after 5 retries, failing MigrationPlan.")
+					migrationplan.Status.MigrationStatus = corev1.PodFailed
+					migrationplan.Status.MigrationMessage = "RDM disk not migrated after maximum retries."
+					if err := r.Update(ctx, migrationplan); err != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to update MigrationPlan status: %w", err)
+					}
+					return ctrl.Result{}, nil
+				}
+				delay := 5 * time.Duration(math.Pow(2, float64(retries))) * time.Second
+				r.ctxlog.Info("RDM disk not migrated yet, requeuing MigrationPlan.", "retryCount", retries, "requeueAfter", delay)
+				migrationplan.Status.RetryCount++
+				if err := r.Update(ctx, migrationplan); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to update MigrationPlan retry count: %w", err)
+				}
+				return ctrl.Result{RequeueAfter: delay}, nil
 			}
 			return ctrl.Result{}, err
 		}
@@ -994,6 +1014,13 @@ func (r *MigrationPlanReconciler) TriggerMigration(ctx context.Context,
 	migrationtemplate *vjailbreakv1alpha1.MigrationTemplate,
 	parallelvms []string) error {
 	ctxlog := r.ctxlog.WithValues("migrationplan", migrationplan.Name)
+
+	// Create a map for efficient lookup of parallel VMs
+	parallelVMsMap := make(map[string]bool)
+	for _, vm := range parallelvms {
+		parallelVMsMap[vm] = true
+	}
+
 	var (
 		fbcm *corev1.ConfigMap
 	)
@@ -1023,6 +1050,45 @@ func (r *MigrationPlanReconciler) TriggerMigration(ctx context.Context,
 		}
 		if vmMachineObj == nil {
 			return errors.Wrap(fmt.Errorf("VM '%s' not found in VMwareMachine", vm), "failed to find vmwaremachine")
+		}
+		// Handle RDM disks for this VM
+		if len(vmMachineObj.Spec.VMInfo.RDMDisks) > 0 {
+			for _, rdmDisk := range vmMachineObj.Spec.VMInfo.RDMDisks {
+				// Get RDMDisk CR
+				rdmDiskCR := &vjailbreakv1alpha1.RdmDisk{}
+				err := r.Get(ctx, types.NamespacedName{
+					Name:      strings.TrimSpace(rdmDisk),
+					Namespace: migrationtemplate.Namespace,
+				}, rdmDiskCR)
+
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						return fmt.Errorf("failed to get RDMDisk CR: %w", err)
+					}
+				} else {
+					// Validate that all ownerVMs are present in parallelVMs
+					for _, ownerVM := range rdmDiskCR.Spec.OwnerVMs {
+						if !parallelVMsMap[ownerVM] {
+							return fmt.Errorf("ownerVM %q in RDM disk %s not found in migration plan ", ownerVM, rdmDisk)
+						}
+					}
+					// Update existing RDMDisk CR
+					err := ValidateRdmDiskFields(rdmDiskCR)
+					if err != nil {
+						return fmt.Errorf("failed to validate RDMDisk CR: %w", err)
+					}
+					if !rdmDiskCR.Spec.ImportToCinder {
+						rdmDiskCR.Spec.ImportToCinder = true
+						if err := r.Update(ctx, rdmDiskCR); err != nil {
+							return fmt.Errorf("failed to update RDMDisk CR: %w", err)
+						}
+					}
+					if rdmDiskCR.Status.Phase != "Managed" || rdmDiskCR.Status.CinderVolumeID == "" {
+						return utils.ErrRDMDiskNotMigrated
+					}
+				}
+			}
+
 		}
 		migrationobj, err := r.CreateMigration(ctx, migrationplan, vm, vmMachineObj)
 		if err != nil {

@@ -848,18 +848,6 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		}
 		return errors.Wrap(err, "failed to live replicate disks")
 	}
-	/*
-		// Todo in rdm controller and introduce reque logic
-		// Import LUN and MigrateRDM disk
-		for idx, rdmDisk := range vminfo.RDMDisks {
-			volumeID, err := migobj.cinderManage(rdmDisk)
-			if err != nil {
-				migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
-				return errors.Wrap(err, "failed to import LUN")
-			}
-			vminfo.RDMDisks[idx].VolumeId = volumeID
-		}
-	*/
 	// Convert the Boot Disk to raw format
 	err = migobj.ConvertVolumes(ctx, vminfo)
 	if err != nil {

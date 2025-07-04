@@ -27,13 +27,13 @@ import (
 type RdmDiskSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	DiskName       string        `json:"diskName"`
-	DiskSize       int           `json:"diskSize"`
-	UUID           string        `json:"uuid"`
-	DisplayName    string        `json:"displayName"`
-	OwnerVMs       []string      `json:"ownerVMs"`
-	VolumeRef      VolumeRefInfo `json:"volumeRef"`
-	ImportToCinder bool          `json:"importToCinder,omitempty"` // Indicates if the RDM disk is being imported
+	DiskName           string        `json:"diskName"`
+	DiskSize           int           `json:"diskSize"`
+	UUID               string        `json:"uuid"`
+	DisplayName        string        `json:"displayName"`
+	OwnerVMs           []string      `json:"ownerVMs"`
+	OpenstackVolumeRef VolumeRefInfo `json:"openstackVolumeRef"`
+	ImportToCinder     bool          `json:"importToCinder,omitempty"` // Indicates if the RDM disk is being imported
 }
 
 // RdmDiskStatus defines the observed state of RdmDisk.

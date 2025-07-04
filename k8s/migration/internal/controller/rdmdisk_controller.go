@@ -68,13 +68,13 @@ func (r *RdmDiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	switch rdmDisk.Status.Phase {
 	case "Created":
 		// Validate the RDM disk specifications
-		if err := validateRdmDiskFields(rdmDisk); err != nil {
+		if err := ValidateRdmDiskFields(rdmDisk); err != nil {
 			log.Error(err, "validation failed")
 			rdmDisk.Status.Phase = "Error"
 			startCondition := metav1.Condition{
 				Type:    "ValidationFailed",
 				Status:  metav1.ConditionTrue,
-				Reason:  "FieldValidationFailed",
+				Reason:  "Required Fields Missing",
 				Message: err.Error(),
 			}
 			meta.SetStatusCondition(&rdmDisk.Status.Conditions, startCondition)
@@ -106,9 +106,9 @@ func (r *RdmDiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 			// Create the RDM disk object with required fields
 			rdmDiskObj := vm.RDMDisk{
-				VolumeRef:         rdmDisk.Spec.VolumeRef.Source,
-				CinderBackendPool: rdmDisk.Spec.VolumeRef.CinderBackendPool,
-				VolumeType:        rdmDisk.Spec.VolumeRef.VolumeType,
+				VolumeRef:         rdmDisk.Spec.OpenstackVolumeRef.Source,
+				CinderBackendPool: rdmDisk.Spec.OpenstackVolumeRef.CinderBackendPool,
+				VolumeType:        rdmDisk.Spec.OpenstackVolumeRef.VolumeType,
 			}
 
 			migrationObj := &migrate.Migrate{}
@@ -163,18 +163,17 @@ func (r *RdmDiskReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // validateRdmDiskFields validates all required fields for migration
-func validateRdmDiskFields(rdmDisk *vjailbreakv1alpha1.RdmDisk) error {
-	if len(rdmDisk.Spec.VolumeRef.Source) == 0 {
-		return fmt.Errorf("volumeRef.source is required")
+func ValidateRdmDiskFields(rdmDisk *vjailbreakv1alpha1.RdmDisk) error {
+	if len(rdmDisk.Spec.OpenstackVolumeRef.Source) == 0 {
+		return fmt.Errorf("OpenstackVolumeRef.source is required")
 	}
 
-	if rdmDisk.Spec.VolumeRef.CinderBackendPool == "" {
-		return fmt.Errorf("volumeRef.cinderBackendPool is required")
+	if rdmDisk.Spec.OpenstackVolumeRef.CinderBackendPool == "" {
+		return fmt.Errorf("OpenstackVolumeRef.cinderBackendPool is required")
 	}
 
-	if rdmDisk.Spec.VolumeRef.VolumeType == "" {
-		return fmt.Errorf("volumeRef.volumeType is required")
+	if rdmDisk.Spec.OpenstackVolumeRef.VolumeType == "" {
+		return fmt.Errorf("OpenstackVolumeRef.volumeType is required")
 	}
-
 	return nil
 }

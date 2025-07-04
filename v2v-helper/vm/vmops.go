@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	reflect "reflect"
 	"strings"
 	"time"
 
@@ -264,11 +263,17 @@ func (vmops *VMOps) UpdateDisksInfo(vminfo *VMInfo) error {
 			vminfo.VMDisks[idx].ChangeID = snapid[idx]
 		}
 		// Based on VMName and diskname fetch DiskInfo
-		rdmDIskInfo, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name)
+		vms, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get rdmDisk properties: %s", err)
 		}
-		copyRDMDisks(vminfo, rdmDIskInfo)
+		for _, disk := range vms.Spec.VMInfo.RDMDisks {
+			rdmDiskInfo, err := GetRDMDisk(vmops.ctx, vmops.k8sClient, disk)
+			if err != nil {
+				return fmt.Errorf("failed to get rdmDisk properties: %s", err)
+			}
+			copyRDMDisks(vminfo, rdmDiskInfo)
+		}
 	}
 
 	return nil
@@ -574,34 +579,60 @@ func GetVMwareMachine(ctx context.Context, client k8sclient.Client, vmName strin
 	return vmwareMachine, nil
 }
 
-func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine) {
+// GetRDMDisk retrieves an RDMDisk object from the Kubernetes cluster based on the disk name.
+func GetRDMDisk(ctx context.Context, client k8sclient.Client, diskName string) (*vjailbreakv1alpha1.RdmDisk, error) {
+	if client == nil || ctx == nil || diskName == "" {
+		return nil, fmt.Errorf("invalid parameters: client, context, and diskName must not be nil or empty")
+	}
+
+	// Convert disk name to k8s compatible name
+	sanitizedDiskName, err := utils.ConvertToK8sName(diskName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert disk name to k8s name: %w", err)
+	}
+
+	// Create namespaced name for lookup
+	namespacedName := k8stypes.NamespacedName{
+		Name:      sanitizedDiskName,                  // Use the sanitized disk name
+		Namespace: constants.MigrationSystemNamespace, // Specify the namespace
+	}
+
+	rdmDisk := &vjailbreakv1alpha1.RdmDisk{}
+	// Get RDMDisk object
+	if err := client.Get(ctx, namespacedName, rdmDisk); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil, fmt.Errorf("RDMDisk '%s' not found in namespace '%s'", sanitizedDiskName, namespacedName.Namespace)
+		}
+		return nil, fmt.Errorf("failed to get RDMDisk: %w", err)
+	}
+
+	if rdmDisk.Status.Phase != "Managed" || rdmDisk.Status.CinderVolumeID == "" {
+		return nil, fmt.Errorf("RDMDisk '%s' is not in Ready phase, current phase: %s", sanitizedDiskName, rdmDisk.Status.Phase)
+	}
+
+	return rdmDisk, nil
+}
+
+func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.RdmDisk) {
 	// Check if vminfo is nil
 	if vminfo == nil || rdmDiskInfo == nil {
 		fmt.Printf("vminfo or rdm disk info is is nil")
 		return
 	}
-	if reflect.DeepEqual(rdmDiskInfo.Spec, vjailbreakv1alpha1.VMwareMachineSpec{}) {
-		fmt.Printf("rdm disk info spec is nil")
-		return
+	if len(vminfo.RDMDisks) == 0 {
+		// Initialize RDMDisks slice if it's empty
+		vminfo.RDMDisks = make([]RDMDisk, 0)
 	}
-	if reflect.DeepEqual(rdmDiskInfo.Spec.VMInfo, vjailbreakv1alpha1.VMInfo{}) {
-		fmt.Printf("rdm disk info spec is nil")
-		return
-	}
-	if rdmDiskInfo.Spec.VMInfo.RDMDisks != nil {
-		vminfo.RDMDisks = make([]RDMDisk, len(rdmDiskInfo.Spec.VMInfo.RDMDisks))
-		for i, disk := range rdmDiskInfo.Spec.VMInfo.RDMDisks {
-			vminfo.RDMDisks[i] = RDMDisk{
-				DiskName:          disk.DiskName,
-				DiskSize:          disk.DiskSize,
-				UUID:              disk.UUID,
-				DisplayName:       disk.DisplayName,
-				CinderBackendPool: disk.OpenstackVolumeRef.CinderBackendPool,
-				VolumeType:        disk.OpenstackVolumeRef.VolumeType,
-				VolumeRef:         disk.OpenstackVolumeRef.VolumeRef,
-			}
-		}
-	}
+	vminfo.RDMDisks = append(vminfo.RDMDisks, RDMDisk{
+		DiskName:          rdmDiskInfo.Spec.DiskName,
+		DiskSize:          int64(rdmDiskInfo.Spec.DiskSize),
+		UUID:              rdmDiskInfo.Spec.UUID,
+		DisplayName:       rdmDiskInfo.Spec.DisplayName,
+		CinderBackendPool: rdmDiskInfo.Spec.OpenstackVolumeRef.CinderBackendPool,
+		VolumeType:        rdmDiskInfo.Spec.OpenstackVolumeRef.VolumeType,
+		VolumeRef:         rdmDiskInfo.Spec.OpenstackVolumeRef.Source,
+		VolumeId:          rdmDiskInfo.Status.CinderVolumeID,
+	})
 }
 func (vmops *VMOps) ListSnapshots() ([]types.VirtualMachineSnapshotTree, error) {
 	vm := vmops.VMObj

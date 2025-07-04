@@ -49,7 +49,7 @@ type VMInfo struct {
 	// AssignedIp is the IP address assigned to the VM
 	AssignedIP string `json:"assignedIp,omitempty"`
 	// RDMDisks is the list of RDM disks for the virtual machine
-	RDMDisks []RDMDiskInfo `json:"rdmDisks,omitempty"`
+	RDMDisks []string `json:"rdmDisks,omitempty"`
 }
 
 // VMwareMachineSpec defines the desired state of VMwareMachine
@@ -107,20 +107,6 @@ type OpenStackVolumeRefInfo struct {
 	CinderBackendPool string `json:"cinderBackendPool,omitempty"`
 	// VolumeType is the volume type of the disk
 	VolumeType string `json:"volumeType,omitempty"`
-}
-
-// RDMDiskInfo contains information about a Raw Device Mapping (RDM) disk
-type RDMDiskInfo struct {
-	// DiskName is the name of the disk
-	DiskName string `json:"diskName,omitempty"`
-	// DiskSize is the size of the disk in GB
-	DiskSize int64 `json:"diskSize,omitempty"`
-	// UUID (VML id) is the unique identifier of the disk
-	UUID string `json:"uuid,omitempty"`
-	// DisplayName is the display name of the disk
-	DisplayName string `json:"displayName,omitempty"`
-	// OpenstackVolumeRef contains OpenStack volume reference information
-	OpenstackVolumeRef OpenStackVolumeRefInfo `json:"openstackVolumeRef,omitempty"`
 }
 
 func init() {

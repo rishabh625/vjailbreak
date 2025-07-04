@@ -30,7 +30,7 @@ import (
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/constants"
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/scope"
-	openstackutils "github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
 )
 
 // Network represents network configuration for OpenStack VMs
@@ -66,7 +66,7 @@ func CheckAndCreateMasterNodeEntry(ctx context.Context, k3sclient client.Client,
 		openstackuuid = "fake-openstackuuid"
 	} else {
 		// Controller manager is always on the master node due to pod affinity
-		openstackuuid, err = openstackutils.GetCurrentInstanceUUID()
+		openstackuuid, err = migrateutils.GetCurrentInstanceUUID()
 		if err != nil {
 			return errors.Wrap(err, "failed to get current instance uuid")
 		}

@@ -97,42 +97,7 @@ spec:
                     description: RDMDisks is the list of RDM disks for the virtual
                       machine
                     items:
-                      description: RDMDiskInfo contains information about a Raw Device
-                        Mapping (RDM) disk
-                      properties:
-                        diskName:
-                          description: DiskName is the name of the disk
-                          type: string
-                        diskSize:
-                          description: DiskSize is the size of the disk in GB
-                          format: int64
-                          type: integer
-                        displayName:
-                          description: DisplayName is the display name of the disk
-                          type: string
-                        openstackVolumeRef:
-                          description: OpenstackVolumeRef contains OpenStack volume
-                            reference information
-                          properties:
-                            cinderBackendPool:
-                              description: CinderBackendPool is the cinder backend
-                                pool of the disk
-                              type: string
-                            volumeRef:
-                              additionalProperties:
-                                type: string
-                              description: VolumeRef is the reference to the OpenStack
-                                volume
-                              type: object
-                            volumeType:
-                              description: VolumeType is the volume type of the disk
-                              type: string
-                          type: object
-                        uuid:
-                          description: UUID (VML id) is the unique identifier of the
-                            disk
-                          type: string
-                      type: object
+                      type: string
                     type: array
                   vmState:
                     description: VMState is the state of the virtual machine

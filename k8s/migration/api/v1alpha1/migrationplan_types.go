@@ -94,6 +94,8 @@ type MigrationPlanStatus struct {
 	MigrationStatus corev1.PodPhase `json:"migrationStatus"`
 	// MigrationMessage is the message associated with the migration
 	MigrationMessage string `json:"migrationMessage"`
+	// Migration RetryCount is the number of times the migration has been retried
+	RetryCount int `json:"retryCount,omitempty"`
 }
 
 // +kubebuilder:object:root=true
