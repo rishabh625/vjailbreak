@@ -779,6 +779,14 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 	if err != nil {
 		return fmt.Errorf("failed to convert VM name: %w", err)
 	}
+	esxiK8sName, err := ConvertToK8sName(vminfo.ESXiName)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert ESXi name to k8s name")
+	}
+	clusterK8sName, err := ConvertToK8sName(vminfo.ClusterName)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert cluster name to k8s name")
+	}
 	// We need this flag because, there can be multiple VMwarecreds and each will
 	// trigger its own reconciliation loop,
 	// so we need to know if the object is new or not. if it is new we mark the migrated
@@ -803,9 +811,9 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 				Name:      vmwvmKey.Name,
 				Namespace: vmwcreds.Namespace,
 				Labels: map[string]string{
-					constants.VMwareCredsLabel: vmwcreds.Name,
-					constants.ESXiNameLabel:    vminfo.ESXiName,
-					constants.ClusterNameLabel: vminfo.ClusterName,
+					constants.VMwareCredsLabel:   vmwcreds.Name,
+					constants.ESXiNameLabel:      esxiK8sName,
+					constants.VMwareClusterLabel: clusterK8sName,
 				},
 			},
 			Spec: vjailbreakv1alpha1.VMwareMachineSpec{
@@ -832,7 +840,7 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 		// Set the new label
 		vmwvm.Labels[constants.VMwareCredsLabel] = vmwcreds.Name
 
-		if !reflect.DeepEqual(vmwvm.Spec.VMInfo, *vminfo) || !reflect.DeepEqual(vmwvm.Labels[constants.ESXiNameLabel], vminfo.ESXiName) || !reflect.DeepEqual(vmwvm.Labels[constants.ClusterNameLabel], vminfo.ClusterName) {
+		if !reflect.DeepEqual(vmwvm.Spec.VMInfo, *vminfo) || !reflect.DeepEqual(vmwvm.Labels[constants.ESXiNameLabel], esxiK8sName) || !reflect.DeepEqual(vmwvm.Labels[constants.VMwareClusterLabel], clusterK8sName) {
 			syncRDMDisks(vminfo, vmwvm)
 			// update vminfo in case the VM has been moved by vMotion
 			assignedIP := ""
@@ -851,8 +859,8 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 			if osType != "" && vmwvm.Spec.VMInfo.OSFamily == "" {
 				vmwvm.Spec.VMInfo.OSFamily = osType
 			}
-			vmwvm.Labels[constants.ESXiNameLabel] = vminfo.ESXiName
-			vmwvm.Labels[constants.ClusterNameLabel] = vminfo.ClusterName
+			vmwvm.Labels[constants.ESXiNameLabel] = esxiK8sName
+			vmwvm.Labels[constants.VMwareClusterLabel] = clusterK8sName
 
 			if vmwvm.Spec.VMInfo.OSFamily == "" {
 				vmwvm.Spec.VMInfo.OSFamily = currentOSFamily
@@ -1234,7 +1242,7 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 					}
 					mp := make(map[string]string)
 					mp[splotVolRef[0]] = splotVolRef[1]
-					fmt.Println("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
+					log.Info("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
 					rdmInfo.OpenstackVolumeRef = vjailbreakv1alpha1.OpenStackVolumeRefInfo{
 						VolumeRef: mp,
 					}

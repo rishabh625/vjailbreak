@@ -207,3 +207,9 @@ func (mr *MockVMOperationsMockRecorder) VMPowerOn() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VMPowerOn", reflect.TypeOf((*MockVMOperations)(nil).VMPowerOn))
 }
+
+// CleanUpSnapshots indicates an expected call of CleanUpSnapshots.
+func (mr *MockVMOperationsMockRecorder) CleanUpSnapshots(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanUpSnapshots", reflect.TypeOf((*MockVMOperations)(nil).TakeSnapshot), name)
+}

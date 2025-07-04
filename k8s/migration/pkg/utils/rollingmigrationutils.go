@@ -123,7 +123,7 @@ func CreateESXIMigration(ctx context.Context, scope *scope.ClusterMigrationScope
 			Name:      GenerateRollingMigrationObjectName(esxiK8sName, scope.RollingMigrationPlan),
 			Namespace: constants.NamespaceMigrationSystem,
 			Labels: map[string]string{
-				constants.ESXiNameLabel:             esxi,
+				constants.ESXiNameLabel:             esxiK8sName,
 				constants.VMwareCredsLabel:          scope.ClusterMigration.Spec.VMwareCredsRef.Name,
 				constants.RollingMigrationPlanLabel: scope.RollingMigrationPlan.Name,
 				constants.ClusterMigrationLabel:     scope.ClusterMigration.Name,
@@ -170,7 +170,7 @@ func AddVMsToESXIMigrationStatus(ctx context.Context, k8sClient client.Client, e
 
 	vmList := vjailbreakv1alpha1.VMwareMachineList{}
 
-	if err := k8sClient.List(ctx, &vmList, client.InNamespace(constants.NamespaceMigrationSystem), client.MatchingLabels{constants.ESXiNameLabel: esxi, constants.VMwareCredsLabel: esxiMigration.Spec.VMwareCredsRef.Name}); err != nil {
+	if err := k8sClient.List(ctx, &vmList, client.InNamespace(constants.NamespaceMigrationSystem), client.MatchingLabels{constants.ESXiNameLabel: esxiK8sName, constants.VMwareCredsLabel: esxiMigration.Spec.VMwareCredsRef.Name}); err != nil {
 		return errors.Wrap(err, "failed to get ESXi migration status")
 	}
 

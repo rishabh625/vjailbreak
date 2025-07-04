@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 
 	"github.com/gophercloud/gophercloud"
@@ -45,6 +45,7 @@ type OpenstackOperations interface {
 	DeleteVolume(volumeID string) error
 	FindDevice(volumeID string) (string, error)
 	WaitUntilVMActive(vmID string) (bool, error)
+	CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error)
 }
 
 func getCert(endpoint string) (*x509.Certificate, error) {
@@ -65,7 +66,7 @@ func getCert(endpoint string) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-func validateOpenStack(insecure bool) (*utils.OpenStackClients, error) {
+func validateOpenStack(insecure bool) (*migrateutils.OpenStackClients, error) {
 	opts, err := openstack.AuthOptionsFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OpenStack auth options: %s", err)
@@ -131,14 +132,14 @@ func validateOpenStack(insecure bool) (*utils.OpenStackClients, error) {
 		return nil, fmt.Errorf("failed to create networking client: %s", err)
 	}
 
-	return &utils.OpenStackClients{
+	return &migrateutils.OpenStackClients{
 		BlockStorageClient: blockStorageClient,
 		ComputeClient:      computeClient,
 		NetworkingClient:   networkingClient,
 	}, nil
 }
 
-func NewOpenStackClients(insecure bool) (*utils.OpenStackClients, error) {
+func NewOpenStackClients(insecure bool) (*migrateutils.OpenStackClients, error) {
 	ostackclients, err := validateOpenStack(insecure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate OpenStack connection: %s", err)
