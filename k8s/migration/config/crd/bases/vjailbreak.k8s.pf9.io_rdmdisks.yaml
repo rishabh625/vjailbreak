@@ -54,6 +54,8 @@ spec:
                 properties:
                   cinderBackendPool:
                     type: string
+                  openstackCreds:
+                    type: string
                   source:
                     additionalProperties:
                       type: string

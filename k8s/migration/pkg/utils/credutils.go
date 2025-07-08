@@ -637,8 +637,8 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 				break
 			}
 			if !reflect.DeepEqual(rdmInfos, vjailbreakv1alpha1.RdmDisk{}) {
-				rdmNames = append(rdmNames, strings.TrimSpace(rdmInfos.Spec.DiskName))
-				if savedRDMDetails, ok := rdmDiskInfos[rdmInfos.Spec.DiskName]; ok {
+				rdmNames = append(rdmNames, strings.TrimSpace(rdmInfos.Spec.UUID))
+				if savedRDMDetails, ok := rdmDiskInfos[rdmInfos.Spec.UUID]; ok {
 					// Compare OpenstackVolumeRef details
 					if reflect.DeepEqual(savedRDMDetails.Spec.OpenstackVolumeRef.Source, rdmInfos.Spec.OpenstackVolumeRef.Source) ||
 						savedRDMDetails.Spec.OpenstackVolumeRef.CinderBackendPool != rdmInfos.Spec.OpenstackVolumeRef.CinderBackendPool ||
@@ -653,7 +653,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 						slices.Sort(rdmInfos.Spec.OwnerVMs) // Sort OwnerVMs alphabetically
 					}
 				} else {
-					rdmDiskInfos[strings.TrimSpace(rdmInfos.Spec.DiskName)] = rdmInfos
+					rdmDiskInfos[strings.TrimSpace(rdmInfos.Spec.UUID)] = rdmInfos
 				}
 			}
 
@@ -695,7 +695,7 @@ func GetAllVMs(ctx context.Context, k3sclient client.Client, vmwcreds *vjailbrea
 				continue
 			}
 			for _, rdm := range returnedRdmVMwiseAttr {
-				rdmDiskInfos[rdm.Spec.DiskName] = rdm
+				rdmDiskInfos[rdm.Spec.UUID] = rdm
 			}
 		}
 
@@ -1170,24 +1170,45 @@ func containsString(slice []string, target string) bool {
 }
 
 // syncRDMDisks handles synchronization of RDM disk information between VMInfo and VMwareMachine
-func syncRDMDisks(ctx context.Context, k3sclient client.Client, rdmInfo []vjailbreakv1alpha1.RdmDisk) error {
+func syncRDMDisks(ctx context.Context, k3sclient client.Client, rdmInfo []vjailbreakv1alpha1.RdmDisk, vmwcreds *vjailbreakv1alpha1.VMwareCreds) error {
 	// Both have RDM disks - preserve OpenStack related information
 	// Create a map of existing VMware Machine RDM disks by disk name
 	existingDisks := make(map[string]vjailbreakv1alpha1.RdmDisk)
 	for _, disk := range rdmInfo {
 		rdmDiskCR := &vjailbreakv1alpha1.RdmDisk{}
 		err := k3sclient.Get(ctx, types.NamespacedName{
-			Name:      strings.TrimSpace(disk.Spec.DiskName),
+			Name:      strings.TrimSpace(disk.Spec.UUID),
 			Namespace: constants.NamespaceMigrationSystem,
 		}, rdmDiskCR)
 
 		if err == nil {
-			existingDisks[disk.Spec.DiskName] = *rdmDiskCR
+			existingDisks[disk.Spec.UUID] = *rdmDiskCR
+		} else if apierrors.IsNotFound(err) {
+			// Create a new RDM disk based on rdmInfo
+			rdmDiskCR = &vjailbreakv1alpha1.RdmDisk{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      strings.TrimSpace(disk.Spec.UUID),
+					Namespace: constants.NamespaceMigrationSystem,
+				},
+				Spec: disk.Spec,
+			}
+			// Add labels to the RDM disk object
+			rdmDiskCR.ObjectMeta.Labels = map[string]string{
+				"vjailbreak.k8s.pf9.io/shared-rdm-name": strings.TrimSpace(disk.Spec.DiskName),
+				"vjailbreak.k8s.pf9.io/is-shared-rdm":   "true",
+				"vjailbreak.k8s.pf9.io/vmwarecreds":     vmwcreds.Name,
+			}
+			if createErr := k3sclient.Create(ctx, rdmDiskCR); createErr != nil {
+				return errors.Wrap(createErr, "failed to create RDM disk")
+			}
+			existingDisks[disk.Spec.UUID] = *rdmDiskCR
+		} else {
+			return errors.Wrap(err, "failed to retrieve RDM disk")
 		}
 
 		// Update VMInfo RDM disks while preserving OpenStack information
 		for i, vmwareDisks := range rdmInfo {
-			if existingDisk, ok := existingDisks[vmwareDisks.Spec.DiskName]; ok {
+			if existingDisk, ok := existingDisks[vmwareDisks.Spec.UUID]; ok {
 				// Preserve OpenStack volume reference if new one is nil
 				if reflect.DeepEqual(vmwareDisks.Spec.OpenstackVolumeRef, vjailbreakv1alpha1.OpenStackVolumeRefInfo{}) &&
 					!reflect.DeepEqual(existingDisk.Spec.OpenstackVolumeRef, vjailbreakv1alpha1.OpenStackVolumeRefInfo{}) {
@@ -1338,7 +1359,7 @@ func getClusterNameFromHost(ctx context.Context, c *vim25.Client, host mo.HostSy
 // CreateOrUpdateRDMDisks creates or updates CreateOrUpdateRDMDisks objects for the given VMs
 func CreateOrUpdateRDMDisks(ctx context.Context, client client.Client,
 	vmwcreds *vjailbreakv1alpha1.VMwareCreds, rdmInfo []vjailbreakv1alpha1.RdmDisk) error {
-	err := syncRDMDisks(ctx, client, rdmInfo)
+	err := syncRDMDisks(ctx, client, rdmInfo, vmwcreds)
 	if err != nil {
 		return err
 	}
