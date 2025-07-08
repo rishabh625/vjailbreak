@@ -985,7 +985,7 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 func (migobj *Migrate) cinderManage(rdmDisk vm.RDMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
 	migobj.logMessage(fmt.Sprintf("Importing LUN: %s", rdmDisk.DiskName))
-	volume, err := openstackops.CinderManage(rdmDisk)
+	volume, err := openstackops.CinderManage(rdmDisk, "volume 3.8")
 	if err != nil || volume == nil {
 		return "", fmt.Errorf("failed to import LUN: %s", err)
 	} else if volume.ID == "" {

@@ -48,7 +48,7 @@ func RDMDiskToVolumeManageMap(rdmDisk vm.RDMDisk) (map[string]interface{}, error
 }
 
 // CinderManage Manage triggers the volume manage request and returns volume.
-func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Volume, error) {
+func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk, openstackAPIVersion string) (*volumes.Volume, error) {
 
 	body, err := RDMDiskToVolumeManageMap(rdmDisk)
 	if err != nil {
@@ -59,7 +59,7 @@ func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk) (*volumes.Vol
 
 	response, err := osclient.BlockStorageClient.Post(osclient.BlockStorageClient.ServiceURL("manageable_volumes"), body, &result, &gophercloud.RequestOpts{
 		OkCodes:     []int{http.StatusAccepted},
-		MoreHeaders: map[string]string{"OpenStack-API-Version": "volume 3.8"},
+		MoreHeaders: map[string]string{"OpenStack-API-Version": openstackAPIVersion},
 	})
 	if err != nil {
 		return nil, err
