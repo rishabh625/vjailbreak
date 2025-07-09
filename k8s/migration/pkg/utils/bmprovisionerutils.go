@@ -37,20 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// CloudInitParams holds OpenStack authentication parameters for cloud-init configuration.
-// These parameters are used when generating cloud-init configurations for bare metal nodes.
-type CloudInitParams struct {
-	AuthURL     string
-	Username    string
-	Password    string
-	RegionName  string
-	TenantName  string
-	Insecure    bool
-	DomainName  string
-	FQDN        string
-	KeystoneURL string
-}
-
 // ConvertESXiToPCDHost converts an ESXi host to a PCD host by reclaiming the hardware
 func ConvertESXiToPCDHost(ctx context.Context,
 	scope *scope.ESXIMigrationScope,
@@ -223,7 +209,7 @@ func MergeCloudInit(userData, cloudInit string) (string, error) {
 }
 
 // MergeCloudInitAndCreateSecret merges cloud-init configurations and creates a secret with the result
-func MergeCloudInitAndCreateSecret(ctx context.Context, scope *scope.RollingMigrationPlanScope) error {
+func MergeCloudInitAndCreateSecret(ctx context.Context, scope *scope.RollingMigrationPlanScope, local bool) error {
 	// Get BMConfig for the rolling migration plan
 	bmConfig, err := GetBMConfigForRollingMigrationPlan(ctx, scope.Client, scope.RollingMigrationPlan)
 	if err != nil {
@@ -243,7 +229,7 @@ func MergeCloudInitAndCreateSecret(ctx context.Context, scope *scope.RollingMigr
 
 	userData := string(userDataSecret.Data[constants.UserDataSecretKey])
 
-	cloudInit, err := generatePCDOnboardingCloudInit(ctx, scope)
+	cloudInit, err := generatePCDOnboardingCloudInit(ctx, scope, local)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate cloud init for BMConfig")
 	}
@@ -294,7 +280,7 @@ func MergeCloudInitAndCreateSecret(ctx context.Context, scope *scope.RollingMigr
 	return nil
 }
 
-func generatePCDOnboardingCloudInit(ctx context.Context, scope *scope.RollingMigrationPlanScope) (string, error) {
+func generatePCDOnboardingCloudInit(ctx context.Context, scope *scope.RollingMigrationPlanScope, local bool) (string, error) {
 	openstackCreds, err := GetDestinationOpenstackCredsInfoFromRollingMigrationPlan(ctx, scope.Client, scope.RollingMigrationPlan)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get openstack credentials")
@@ -314,7 +300,13 @@ func generatePCDOnboardingCloudInit(ctx context.Context, scope *scope.RollingMig
 	}
 
 	// read cloud-init template
-	cloudInitTemplateStr, err := os.ReadFile("/pkg/scripts/cloud-init.tmpl.yaml")
+	var cloudInitTemplateLocation string
+	if local {
+		cloudInitTemplateLocation = "./pkg/scripts/cloud-init.tmpl.yaml"
+	} else {
+		cloudInitTemplateLocation = "/pkg/scripts/cloud-init.tmpl.yaml"
+	}
+	cloudInitTemplateStr, err := os.ReadFile(cloudInitTemplateLocation) //nolint: gosec
 	if err != nil {
 		return "", errors.Wrap(err, "failed to read cloud-init template")
 	}
@@ -339,6 +331,21 @@ func GetBMConfigForRollingMigrationPlan(ctx context.Context,
 		return nil, errors.Wrap(err, "failed to get BMConfig for rolling migration plan")
 	}
 	return bmConfig, nil
+}
+
+// GetOpenstackCredsForRollingMigrationPlan retrieves the OpenstackCreds associated with a RollingMigrationPlan
+func GetOpenstackCredsForRollingMigrationPlan(ctx context.Context,
+	k8sClient client.Client,
+	rollingMigrationPlan *vjailbreakv1alpha1.RollingMigrationPlan) (*vjailbreakv1alpha1.OpenstackCreds, error) {
+	migrationTemplate, err := GetMigrationTemplateFromRollingMigrationPlan(ctx, k8sClient, rollingMigrationPlan)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get migration template")
+	}
+	openstackCreds := &vjailbreakv1alpha1.OpenstackCreds{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: migrationTemplate.Spec.Destination.OpenstackRef, Namespace: constants.NamespaceMigrationSystem}, openstackCreds); err != nil {
+		return nil, errors.Wrap(err, "failed to get OpenstackCreds for rolling migration plan")
+	}
+	return openstackCreds, nil
 }
 
 // GetUserDataForBMConfig retrieves user data configuration for a BMConfig from the RollingMigrationPlan

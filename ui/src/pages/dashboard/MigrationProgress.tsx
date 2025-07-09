@@ -4,6 +4,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline"
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom"
 import { Phase } from "src/api/migrations/model"
+import BlockIcon from "@mui/icons-material/Block";
 
 const ProgressContainer = styled(Box)({
   display: "flex",
@@ -24,11 +25,12 @@ export default function MigrationProgress({
   progressText,
   phase
 }: MigrationProgressProps) {
-  // Get phase from the most recent condition
-
-  // Update the statusIcon logic to use the Phase enum
   const statusIcon = useMemo(() => {
-    if (phase === Phase.Succeeded) {
+    if (phase === Phase.Blocked) {
+      return <BlockIcon style={{ color: "red" }} />;
+    } else if (phase === Phase.Failed) {
+      return <ErrorOutlineIcon style={{ color: "red" }} />;
+    } else if (phase === Phase.Succeeded) {
       return <CheckCircleOutlineIcon style={{ color: "green" }} />
     } else if ([
       Phase.Validating,
@@ -40,19 +42,20 @@ export default function MigrationProgress({
       Phase.AwaitingAdminCutOver
     ].includes(phase as Phase)) {
       return <CircularProgress size={20} style={{ marginRight: 3 }} />
-    } else if (phase === Phase.Failed) {
-      return <ErrorOutlineIcon style={{ color: "red" }} />
     } else {
       return <HourglassBottomIcon style={{ color: "grey" }} />
     }
   }, [phase])
 
+
   return (
-    <ProgressContainer>
-      {statusIcon}
-      <Typography variant="body2" sx={{ ml: 2 }}>
-        {progressText}
-      </Typography>
-    </ProgressContainer>
+    <>
+      <ProgressContainer>
+        {statusIcon}
+        <Typography variant="body2" sx={{ ml: 2 }}>
+          {progressText}
+        </Typography>
+      </ProgressContainer>
+    </>
   )
 }

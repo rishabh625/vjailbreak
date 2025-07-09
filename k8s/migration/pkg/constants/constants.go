@@ -72,11 +72,17 @@ const (
 	// PauseMigrationLabel is the label for pausing rolling migration plan
 	PauseMigrationLabel = "vjailbreak.k8s.pf9.io/pause"
 
+	// TrueString is the string representation of boolean true
+	TrueString = "true"
+
 	// UserDataSecretKey is the key for user data secret
 	UserDataSecretKey = "user-data"
 
 	// CloudInitConfigKey is the key for cloud init config
 	CloudInitConfigKey = "cloud-init-config"
+
+	// RollingMigrationPlanValidationConfigKey is the key for rolling migration plan validation config
+	RollingMigrationPlanValidationConfigKey = "validation-config"
 
 	// NodeRoleMaster is the role of the master node
 	NodeRoleMaster = "master"

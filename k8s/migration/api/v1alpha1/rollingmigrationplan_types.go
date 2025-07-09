@@ -42,6 +42,12 @@ const (
 	RollingMigrationPlanPhaseRunning RollingMigrationPlanPhase = "Running"
 	// RollingMigrationPlanPhaseFailed is the phase for failed
 	RollingMigrationPlanPhaseFailed RollingMigrationPlanPhase = "Failed"
+	// RollingMigrationPlanPhaseValidating is the phase for paused
+	RollingMigrationPlanPhaseValidating RollingMigrationPlanPhase = "Validating"
+	// RollingMigrationPlanPhaseValidated is the phase for validated
+	RollingMigrationPlanPhaseValidated RollingMigrationPlanPhase = "Validated"
+	// RollingMigrationPlanPhaseValidationFailed is the phase for validation failed
+	RollingMigrationPlanPhaseValidationFailed RollingMigrationPlanPhase = "ValidationFailed"
 	// RollingMigrationPlanPhaseSucceeded is the phase for succeeded
 	RollingMigrationPlanPhaseSucceeded RollingMigrationPlanPhase = "Succeeded"
 	// RollingMigrationPlanPhaseDeleting is the phase for deleting

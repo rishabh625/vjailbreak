@@ -12,8 +12,9 @@ import { RefetchOptions } from "@tanstack/react-query";
 const STATUS_ORDER = {
     'Running': 0,
     'Failed': 1,
-    'Succeeded': 2,
-    'Pending': 3
+    'Blocked': 2,
+    'Succeeded': 3,
+    'Pending': 4
 }
 const PHASE_STEPS = {
     [Phase.Pending]: 1,
@@ -33,22 +34,49 @@ const getProgressText = (phase: Phase | undefined, conditions: Condition[] | und
         return "Unknown Status";
     }
 
-    const stepNumber = PHASE_STEPS[phase] || 0;
-    const totalSteps = 9;
-
-    // Get the most recent condition's message
     const latestCondition = conditions?.sort((a, b) =>
         new Date(b.lastTransitionTime).getTime() - new Date(a.lastTransitionTime).getTime()
     )[0];
 
     const message = latestCondition?.message || phase;
+    const reason = latestCondition?.reason || '';
+    const isBlocked = reason?.toString() === 'Blocked' || phase === Phase.Blocked;
+
+    if (isBlocked) {
+        if (message.startsWith('CONFLICT:')) {
+            const parts = message.split(':');
+            
+            if (parts.length >= 3) {
+                const conflictType = parts[1];
+                const details = parts.slice(2).join(':');
+
+                switch(conflictType) {
+                    case 'MAC_ALREADY_ALLOCATED':
+                        return `Blocked: MAC address conflict - ${details}`;
+                    case 'IP_ALREADY_ALLOCATED':
+                        return `Blocked: IP address conflict - ${details}`;
+                    case 'IP_NOT_IN_ALLOCATION_POOL':
+                        return `Blocked: IP not in allocation pool - ${details}`;
+                    case 'NETWORK_NOT_MAPPED':
+                        return `Blocked: Configuration error - ${details}`;
+                    default:
+                        return `Blocked: ${conflictType} - ${details}`;
+                }
+            }
+        }
+        
+        return `Blocked: ${message}`;
+    }
+
+    const stepNumber = PHASE_STEPS[phase] || 0;
+    const totalSteps = 9;
 
     if (phase === Phase.Failed || phase === Phase.Succeeded) {
         return `${phase} - ${message}`;
     }
 
     return `STEP ${stepNumber}/${totalSteps}: ${phase} - ${message}`;
-}
+};
 
 const columns: GridColDef[] = [
     {
@@ -60,9 +88,14 @@ const columns: GridColDef[] = [
     {
         field: "status",
         headerName: "Status",
-        valueGetter: (_, row) => row?.status?.phase || "Pending",
+        valueGetter: (_, row) => {
+            const phase: Phase = row?.status?.phase || Phase.Pending;
+            const condition = row?.status?.conditions?.[0];
+            // Use the condition reason if it's a blocked status, otherwise use the phase
+            return condition?.reason === 'Blocked' ? Phase.Blocked : phase;
+        },
         flex: 0.5,
-        sortComparator: (v1, v2) => {
+        sortComparator: (v1: Phase, v2: Phase) => {
             const order1 = STATUS_ORDER[v1] ?? Number.MAX_SAFE_INTEGER;
             const order2 = STATUS_ORDER[v2] ?? Number.MAX_SAFE_INTEGER;
             return order1 - order2;
@@ -81,8 +114,12 @@ const columns: GridColDef[] = [
         valueGetter: (_, row) => getProgressText(row.status?.phase, row.status?.conditions),
         flex: 2,
         renderCell: (params) => {
-            const phase = params.row?.status?.phase
             const conditions = params.row?.status?.conditions
+            const latestCondition = conditions?.sort((a, b) => new Date(b.lastTransitionTime).getTime() - new Date(a.lastTransitionTime).getTime())[0];
+            let phase = params.row?.status?.phase;
+            if (latestCondition?.reason === 'Blocked') {
+                phase = Phase.Blocked;
+            }
             return conditions ? (
                 <MigrationProgress
                     phase={phase}

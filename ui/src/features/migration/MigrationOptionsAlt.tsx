@@ -365,7 +365,7 @@ export default function MigrationOptionsAlt({
     <MenuItem value="_migrated_to_pcd">_migrated_to_pcd</MenuItem>
   </Select>
   <Typography variant="caption">
-    Optional: This suffix will be appended to the source VM name after migration.
+    This suffix will be appended to the source VM name after migration.
   </Typography>
 </Fields>
 
@@ -405,7 +405,7 @@ export default function MigrationOptionsAlt({
     <MenuItem value="vjailbreakedVMs">vjailbreakedVMs</MenuItem>
   </Select>
   <Typography variant="caption">
-    Optional: This folder name will be used to organize the migrated VMs in vCenter.
+    This folder name will be used to organize the migrated VMs in vCenter.
   </Typography>
 </Fields>
 

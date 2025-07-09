@@ -24,15 +24,15 @@ import (
 
 // HostConfig defines the configuration for a Platform9 Distributed Cloud host
 type HostConfig struct {
-	ID                   string            `json:"id,omitempty"`
-	Name                 string            `json:"name,omitempty"`
-	MgmtInterface        string            `json:"mgmtInterface,omitempty"`
-	VMConsoleInterface   string            `json:"vmConsoleInterface,omitempty"`
+	ID                    string            `json:"id,omitempty"`
+	Name                  string            `json:"name,omitempty"`
+	MgmtInterface         string            `json:"mgmtInterface,omitempty"`
+	VMConsoleInterface    string            `json:"vmConsoleInterface,omitempty"`
 	HostLivenessInterface string            `json:"hostLivenessInterface,omitempty"`
-	TunnelingInterface   string            `json:"tunnelingInterface,omitempty"`
-	ImagelibInterface    string            `json:"imagelibInterface,omitempty"`
-	NetworkLabels        map[string]string `json:"networkLabels,omitempty"`
-	ClusterName          string            `json:"clusterName,omitempty"`
+	TunnelingInterface    string            `json:"tunnelingInterface,omitempty"`
+	ImagelibInterface     string            `json:"imagelibInterface,omitempty"`
+	NetworkLabels         map[string]string `json:"networkLabels,omitempty"`
+	ClusterName           string            `json:"clusterName,omitempty"`
 }
 
 // OpenStackCredsInfo holds the actual credentials after decoding

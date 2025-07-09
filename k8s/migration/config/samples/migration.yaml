@@ -3,10 +3,10 @@ kind: OpenstackCreds
 metadata:
   name: sapmo1
 spec:
-  OS_AUTH_URL: <>
+  OS_AUTH_URL: "https://keystone.example.com:5000/v3"  # Replace with actual auth URL
   OS_DOMAIN_NAME: Default
-  OS_USERNAME: <>
-  OS_PASSWORD: <>
+  OS_USERNAME: "some-username"  # Replace with actual username
+  OS_PASSWORD: "some-password"  # Replace with actual password
   OS_REGION_NAME: cspmo
   OS_TENANT_NAME: service
 ---
@@ -15,10 +15,11 @@ kind: VMwareCreds
 metadata:
   name: pnapbmc1
 spec:
-  VCENTER_HOST: <>
+  VCENTER_HOST: "vcenter.example.com"  # Replace with actual vCenter host
   VCENTER_INSECURE: true
-  VCENTER_PASSWORD: <>
-  VCENTER_USERNAME: <>
+  VCENTER_PASSWORD: "some-password"  # Replace with actual password
+  VCENTER_USERNAME: "some-username"  # Replace with actual username
+  datacenter: "Datacenter1"  # Required field from CRD
 ---
 apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
 kind: NetworkMapping
@@ -41,23 +42,35 @@ spec:
       target: __DEFAULT__
 ---
 apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
-kind: Migration
+kind: MigrationTemplate
 metadata:
+  name: migration-template-sample
+spec:
+  networkMapping: nwmap1
+  storageMapping: stmap1
+  osFamily: windowsGuest  # Changed from ostype to osFamily with correct enum value
+  virtioWinDriver: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.189-1/virtio-win-0.1.189.iso
+  source:
+    vmwareRef: pnapbmc1
+  destination:
+    openstackRef: sapmo1
+---
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: MigrationPlan
+metadata:
+  name: vm-migration-sample
   labels:
     app.kubernetes.io/name: migration
     app.kubernetes.io/managed-by: kustomize
-  name: vm-migration-sample
 spec:
-  networkmapping: nwmap1
-  storagemapping: stmap1
-  source:
-    vmwareref: pnapbmc1
-    datacenter: PNAP BMC
-    ostype: windows
-    virtiowindriver: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.189-1/virtio-win-0.1.189.iso
-    virtualmachines:
-    - dev test1
-    - dev test2
-  destination:
-    openstackref: sapmo1
+  migrationTemplate: migration-template-sample
+  retry: true
+  migrationStrategy:
+    type: hot  # Valid enum value: hot or cold
+    dataCopyStart: "2025-07-09T00:00:00Z"
+    vmCutoverStart: "2025-07-10T00:00:00Z"
+    vmCutoverEnd: "2025-07-11T00:00:00Z"
+  virtualmachines:
+    - - "dev test1"
+    - - "dev test2"
 ---

@@ -45,6 +45,11 @@ linters:
       - path: pkg/utils/pcdutils\.go
         linters:
           - dupl
+      # Exclude var-naming check for entire utils package
+      - path: pkg/utils/
+        linters:
+          - revive
+        text: "var-naming: avoid meaningless package names"
     paths:
       - test
   settings:

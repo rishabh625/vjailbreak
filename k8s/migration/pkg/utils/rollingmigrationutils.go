@@ -8,6 +8,7 @@ import (
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/constants"
 	scope "github.com/platform9/vjailbreak/k8s/migration/pkg/scope"
+	providers "github.com/platform9/vjailbreak/pkg/vpwned/sdk/providers"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -16,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -546,7 +548,7 @@ func IsRollingMigrationPlanPaused(ctx context.Context, name string, client clien
 	if rollingMigrationPlan.Labels == nil {
 		return false
 	}
-	return rollingMigrationPlan.Labels[constants.PauseMigrationLabel] == trueString
+	return rollingMigrationPlan.Labels[constants.PauseMigrationLabel] == constants.TrueString
 }
 
 // IsClusterMigrationPaused checks if a cluster migration is currently paused
@@ -558,7 +560,7 @@ func IsClusterMigrationPaused(ctx context.Context, name string, client client.Cl
 	if clusterMigration.Labels == nil {
 		return false
 	}
-	return clusterMigration.Labels[constants.PauseMigrationLabel] == trueString
+	return clusterMigration.Labels[constants.PauseMigrationLabel] == constants.TrueString
 }
 
 // IsESXIMigrationPaused checks if an ESXi migration is currently paused
@@ -570,7 +572,7 @@ func IsESXIMigrationPaused(ctx context.Context, name string, client client.Clien
 	if esxiMigration.Labels == nil {
 		return false
 	}
-	return esxiMigration.Labels[constants.PauseMigrationLabel] == trueString
+	return esxiMigration.Labels[constants.PauseMigrationLabel] == constants.TrueString
 }
 
 // IsMigrationPlanPaused checks if a migration plan is currently paused
@@ -582,7 +584,7 @@ func IsMigrationPlanPaused(ctx context.Context, name string, client client.Clien
 	if migrationPlan.Labels == nil {
 		return false
 	}
-	return migrationPlan.Labels[constants.PauseMigrationLabel] == trueString
+	return migrationPlan.Labels[constants.PauseMigrationLabel] == constants.TrueString
 }
 
 // PauseRollingMigrationPlan pauses all migration operations for a rolling migration plan
@@ -594,7 +596,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 	}
 
 	// Set label on rolling migration plan
-	rollingMigrationPlan.Labels[constants.PauseMigrationLabel] = trueString
+	rollingMigrationPlan.Labels[constants.PauseMigrationLabel] = constants.TrueString
 
 	// Update all child ClusterMigrations
 	for _, cluster := range rollingMigrationPlan.Spec.ClusterSequence {
@@ -609,7 +611,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 		if clusterMigration.Labels == nil {
 			clusterMigration.Labels = make(map[string]string)
 		}
-		clusterMigration.Labels[constants.PauseMigrationLabel] = trueString
+		clusterMigration.Labels[constants.PauseMigrationLabel] = constants.TrueString
 		err = scope.Client.Update(ctx, clusterMigration)
 		if err != nil {
 			log.Error(err, "failed to update cluster migration with pause label", "cluster", cluster.ClusterName)
@@ -635,7 +637,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 			if esxiMigration.Labels == nil {
 				esxiMigration.Labels = make(map[string]string)
 			}
-			esxiMigration.Labels[constants.PauseMigrationLabel] = trueString
+			esxiMigration.Labels[constants.PauseMigrationLabel] = constants.TrueString
 			err = scope.Client.Update(ctx, esxiMigration)
 			if err != nil {
 				log.Error(err, "failed to update ESXi migration with pause label", "esxi", esxi)
@@ -656,7 +658,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 		if migrationPlan.Labels == nil {
 			migrationPlan.Labels = make(map[string]string)
 		}
-		migrationPlan.Labels[constants.PauseMigrationLabel] = trueString
+		migrationPlan.Labels[constants.PauseMigrationLabel] = constants.TrueString
 		err = scope.Client.Update(ctx, migrationPlan)
 		if err != nil {
 			log.Error(err, "failed to update migration plan with pause label", "plan", planName)
@@ -762,4 +764,130 @@ func ResumeRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigrati
 
 	// Update the rolling migration plan itself
 	return scope.Client.Update(ctx, rollingMigrationPlan)
+}
+
+// ValidateRollingMigrationPlan validates that a rolling migration plan meets all the prerequisites
+// It checks VMware credentials, MAAS configurations, and ESXi host readiness
+func ValidateRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigrationPlanScope, configMap *corev1.ConfigMap) (bool, string, error) {
+	config := GetRollingMigrationPlanValidationConfigFromConfigMap(configMap)
+	if config == nil {
+		return false, "", errors.New("failed to get rolling migration plan validation config")
+	}
+
+	vmwareCreds, err := GetSourceVMwareCredsFromRollingMigrationPlan(ctx, scope.Client, scope.RollingMigrationPlan)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to get vmware credentials")
+	}
+
+	// TODO(vpwned): validate vmwarecreds have enough permissions
+
+	// TODO(vpwned): validate there is enough space on underlying storage array
+
+	if !isBMConfigValid(ctx, scope.Client, scope.RollingMigrationPlan.Spec.BMConfigRef.Name) {
+		return false, "", errors.New("BMConfig is not valid")
+	}
+
+	vmwareHosts, err := FilterVMwareHostsForCluster(ctx, scope.Client, scope.RollingMigrationPlan.Spec.ClusterSequence[0].ClusterName)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to filter vmware hosts for cluster")
+	}
+
+	for _, vmwareHost := range vmwareHosts {
+		// This checks if the ESXi host can enter maintenance mode
+		// with all VMs automatically migrating off to other hosts.
+		// It checks host, VM, and cluster settings that could block automatic VM migration.
+		canEnterMaintenanceMode, reason, err := CanEnterMaintenanceMode(ctx, scope, vmwareCreds, vmwareHost.Spec.Name, *config)
+		if err != nil {
+			return false, "", errors.Wrap(err, "failed to check if ESXi can enter maintenance mode")
+		}
+		if !canEnterMaintenanceMode {
+			return false, "", fmt.Errorf("esxi %s cannot be put in maintenance mode, due to %v", vmwareHost.Spec.Name, reason)
+		}
+
+		if config.CheckESXiInMAAS {
+			// Ensure the ESXi host is in MAAS
+			inMAAS, message, err := EnsureESXiInMass(ctx, scope, vmwareHost)
+			if err != nil {
+				return false, "", errors.Wrap(err, "failed to ensure ESXi is in MAAS")
+			}
+			if !inMAAS {
+				return false, "", errors.New(message)
+			}
+		}
+	}
+
+	if config.CheckPCDHasClusterConfigured {
+		// Ensure PCD has at-least one Cluster configured
+		inPCD, message, err := EnsurePCDHasClusterConfigured(ctx, scope)
+		if err != nil {
+			return false, "", errors.Wrap(err, "failed to ensure PCD has at-least one Cluster configured")
+		}
+		if !inPCD {
+			return false, "", errors.New(message)
+		}
+	}
+
+	return true, "", nil
+}
+
+func isBMConfigValid(ctx context.Context, client client.Client, name string) bool {
+	bmConfig := &vjailbreakv1alpha1.BMConfig{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: constants.NamespaceMigrationSystem}, bmConfig)
+	if err != nil {
+		return false
+	}
+	if bmConfig.Status.ValidationStatus != string(corev1.PodSucceeded) {
+		return false
+	}
+
+	return true
+}
+
+// EnsureESXiInMass verifies that an ESXi host is correctly registered in the Metal-as-a-Service system
+// and is in the appropriate state (Deployed or Allocated) for migration operations
+func EnsureESXiInMass(ctx context.Context, scope *scope.RollingMigrationPlanScope, vmwarehost vjailbreakv1alpha1.VMwareHost) (bool, string, error) {
+	// Get maas provider
+	bmConfig, err := GetBMConfigForRollingMigrationPlan(ctx, scope.Client, scope.RollingMigrationPlan)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to get BMConfig for rolling migration plan")
+	}
+	provider, err := providers.GetProvider(string(bmConfig.Spec.ProviderType))
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to get provider")
+	}
+
+	// list maas machines
+	machines, err := provider.ListResources(ctx)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to list maas machines")
+	}
+
+	for i := range machines {
+		if machines[i].HardwareUuid == vmwarehost.Spec.HardwareUUID {
+			if machines[i].Status == "Deployed" || machines[i].Status == "Allocated" {
+				return true, "", nil
+			}
+			return false, fmt.Sprintf("ESXi %s is not in Deployed or Allocated state", vmwarehost.Spec.Name), nil
+		}
+	}
+
+	return false, fmt.Sprintf("ESXi %s is not in MAAS", vmwarehost.Spec.Name), nil
+}
+
+// EnsurePCDHasClusterConfigured verifies that at least one cluster is configured in PCD for the OpenStack credentials
+func EnsurePCDHasClusterConfigured(ctx context.Context, scope *scope.RollingMigrationPlanScope) (bool, string, error) {
+	// Get openstackcreds
+	openstackCreds, err := GetOpenstackCredsForRollingMigrationPlan(ctx, scope.Client, scope.RollingMigrationPlan)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to get openstack creds for rolling migration plan")
+	}
+	// List PCD clusters
+	clusters, err := filterPCDClustersOnOpenstackCreds(ctx, scope.Client, *openstackCreds)
+	if err != nil {
+		return false, "", errors.Wrap(err, "failed to list PCD clusters")
+	}
+	if len(clusters) == 0 {
+		return false, fmt.Sprintf("no PCD clusters configured for openstack creds %s", openstackCreds.Name), nil
+	}
+	return true, "", nil
 }

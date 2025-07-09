@@ -88,15 +88,21 @@ spec:
         - mountPath: /etc/pf9/k3s
           name: master-token
         - mountPath: /home/ubuntu                                 
-          name: vddk 
+          name: vddk
+        - mountPath: /etc/hosts
+          name: hosts-file
       serviceAccountName: controller-manager
       volumes:
       - name: master-token
         hostPath:
           path: /var/lib/rancher/k3s/server
           type: Directory
-      - name: vddk 
+      - name: vddk
         hostPath:                                                                 
           path: /home/ubuntu                                                      
-          type: Directory                                                         
+          type: Directory
+      - name: hosts-file
+        hostPath:
+          path: /etc/hosts
+          type: File                                                      
       terminationGracePeriodSeconds: 30

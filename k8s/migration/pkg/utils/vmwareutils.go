@@ -17,24 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// VMwareHostInfo represents a host in a VMware cluster.
-// It contains essential information about a VMware ESXi host.
-type VMwareHostInfo struct {
-	// Name is the fully qualified domain name or IP address of the host
-	Name string
-	// HardwareUUID is the unique identifier of the host
-	HardwareUUID string
-}
-
-// VMwareClusterInfo represents a cluster in a VMware environment.
-// It contains information about a VMware cluster and its associated hosts.
-type VMwareClusterInfo struct {
-	// Name is the unique identifier of the cluster
-	Name string
-	// Hosts is a list of ESXi hosts that are part of this cluster
-	Hosts []VMwareHostInfo
-}
-
 // GetVMwareClustersAndHosts retrieves a list of all available VMware clusters and their hosts
 func GetVMwareClustersAndHosts(ctx context.Context, k3sclient client.Client, scope *scope.VMwareCredsScope) ([]VMwareClusterInfo, error) {
 	// Pre-allocate clusters slice with initial capacity
@@ -257,4 +239,18 @@ func DeleteStaleVMwareClustersAndHosts(ctx context.Context, k3sclient client.Cli
 		}
 	}
 	return nil
+}
+
+// FilterVMwareHostsForCluster returns a list of VMwareHost resources associated with the specified cluster
+// It filters the hosts by the VMwareClusterLabel matching the provided cluster name
+func FilterVMwareHostsForCluster(ctx context.Context, k3sclient client.Client, clusterName string) ([]vjailbreakv1alpha1.VMwareHost, error) {
+	// List all VMwareHost resources
+	vmwareHosts := &vjailbreakv1alpha1.VMwareHostList{}
+
+	// Filter VMwareHost resources by cluster name
+	if err := k3sclient.List(ctx, vmwareHosts, client.MatchingLabels{constants.VMwareClusterLabel: clusterName}); err != nil {
+		return nil, errors.Wrap(err, "failed to list VMwareHost resources")
+	}
+
+	return vmwareHosts.Items, nil
 }

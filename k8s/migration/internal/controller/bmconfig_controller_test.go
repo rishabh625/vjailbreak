@@ -20,7 +20,7 @@ import (
 	"context"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:revive // dot imports are common in Ginkgo tests
-	. "github.com/onsi/gomega"     //nolint:revive // dot imports are common in Gomega assertions
+	. "github.com/onsi/gomega"    //nolint:revive // dot imports are common in Gomega assertions
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"

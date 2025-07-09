@@ -26,29 +26,29 @@ type ESXIMigrationPhase string
 
 const (
 	// ESXIMigrationPhaseWaiting indicates the ESXi migration is in initial waiting state
-	ESXIMigrationPhaseWaiting                ESXIMigrationPhase = "Waiting"
+	ESXIMigrationPhaseWaiting ESXIMigrationPhase = "Waiting"
 	// ESXIMigrationPhaseRunning indicates the ESXi migration is actively executing
-	ESXIMigrationPhaseRunning                ESXIMigrationPhase = "Running"
+	ESXIMigrationPhaseRunning ESXIMigrationPhase = "Running"
 	// ESXIMigrationPhaseCordoned indicates the ESXi host has been cordoned to prevent new VM placements
-	ESXIMigrationPhaseCordoned               ESXIMigrationPhase = "Cordoned"
+	ESXIMigrationPhaseCordoned ESXIMigrationPhase = "Cordoned"
 	// ESXIMigrationPhaseInMaintenanceMode indicates the ESXi host has been placed in maintenance mode
-	ESXIMigrationPhaseInMaintenanceMode      ESXIMigrationPhase = "InMaintenanceMode"
+	ESXIMigrationPhaseInMaintenanceMode ESXIMigrationPhase = "InMaintenanceMode"
 	// ESXIMigrationPhaseWaitingForVMsToBeMoved indicates the migration is waiting for all VMs to be moved off the host
 	ESXIMigrationPhaseWaitingForVMsToBeMoved ESXIMigrationPhase = "WaitingForVMsToBeMoved"
 	// ESXIMigrationPhaseConvertingToPCDHost indicates the ESXi host is being converted to a PCD host
-	ESXIMigrationPhaseConvertingToPCDHost    ESXIMigrationPhase = "ConvertingToPCDHost"
+	ESXIMigrationPhaseConvertingToPCDHost ESXIMigrationPhase = "ConvertingToPCDHost"
 	// ESXIMigrationPhaseAssigningRole indicates roles are being assigned to the newly converted PCD host
-	ESXIMigrationPhaseAssigningRole          ESXIMigrationPhase = "AssigningRole"
+	ESXIMigrationPhaseAssigningRole ESXIMigrationPhase = "AssigningRole"
 	// ESXIMigrationPhaseFailed indicates the ESXi migration has failed
-	ESXIMigrationPhaseFailed                 ESXIMigrationPhase = "Failed"
+	ESXIMigrationPhaseFailed ESXIMigrationPhase = "Failed"
 	// ESXIMigrationPhaseSucceeded indicates the ESXi migration has completed successfully
-	ESXIMigrationPhaseSucceeded              ESXIMigrationPhase = "Succeeded"
+	ESXIMigrationPhaseSucceeded ESXIMigrationPhase = "Succeeded"
 	// ESXIMigrationPhaseWaitingForPCDHost indicates the migration is waiting for the PCD host to be created or become available
-	ESXIMigrationPhaseWaitingForPCDHost      ESXIMigrationPhase = "WaitingForPCDHost"
+	ESXIMigrationPhaseWaitingForPCDHost ESXIMigrationPhase = "WaitingForPCDHost"
 	// ESXIMigrationPhaseConfiguringPCDHost indicates the PCD host is being configured with appropriate settings
-	ESXIMigrationPhaseConfiguringPCDHost     ESXIMigrationPhase = "ConfiguringPCDHost"
+	ESXIMigrationPhaseConfiguringPCDHost ESXIMigrationPhase = "ConfiguringPCDHost"
 	// ESXIMigrationPhasePaused indicates the migration has been temporarily paused and can be resumed later
-	ESXIMigrationPhasePaused                 ESXIMigrationPhase = "Paused"
+	ESXIMigrationPhasePaused ESXIMigrationPhase = "Paused"
 )
 
 // ESXIMigrationSpec defines the desired state of ESXIMigration including

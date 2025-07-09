@@ -28,7 +28,7 @@ type VjailbreakNodePhase string
 // VjailbreakNodeSpec defines the desired state of VjailbreakNode including
 // node configuration, resource limits, and credentials for provisioning
 type VjailbreakNodeSpec struct {
-	// NodeRole is the role assigned to the node (e.g., "migration-worker", "controller")
+	// NodeRole is the role assigned to the node (e.g., "worker", "controller")
 	NodeRole string `json:"nodeRole"`
 
 	// OpenstackCreds is the reference to the credentials for the OpenStack environment

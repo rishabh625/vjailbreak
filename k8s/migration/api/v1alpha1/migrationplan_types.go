@@ -94,6 +94,9 @@ type MigrationPlanStatus struct {
 	MigrationStatus corev1.PodPhase `json:"migrationStatus"`
 	// MigrationMessage is the message associated with the migration
 	MigrationMessage string `json:"migrationMessage"`
+	// Conditions represents the current state of the migration
+	// +optional
+	Conditions []corev1.PodCondition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

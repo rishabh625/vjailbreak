@@ -1,4 +1,4 @@
-import { Paper, styled, Tab, Tabs, Box, Chip } from "@mui/material"
+import { Paper, styled, Tab, Tabs, Box } from "@mui/material"
 import { useEffect, useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { FIVE_SECONDS, THIRTY_SECONDS } from "src/constants"
@@ -306,17 +306,6 @@ export default function Dashboard() {
                   |
                 </Box>
                 Cluster Conversions
-                <Chip
-                  label="BETA"
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                  sx={{
-                    fontSize: '0.6rem',
-                    height: '16px',
-                    fontWeight: 600
-                  }}
-                />
               </Box>
             }
           />
@@ -324,17 +313,6 @@ export default function Dashboard() {
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 Maas Config
-                <Chip
-                  label="BETA"
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                  sx={{
-                    fontSize: '0.6rem',
-                    height: '16px',
-                    fontWeight: 600
-                  }}
-                />
               </Box>
             }
           />

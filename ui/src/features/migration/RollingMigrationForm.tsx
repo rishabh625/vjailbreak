@@ -1,4 +1,4 @@
-import { Box, Typography, Drawer, styled, Paper, Tooltip, Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Link, Select, MenuItem, GlobalStyles, FormLabel } from "@mui/material"
+import { Box, Typography, Drawer, styled, Paper, Tooltip, Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Select, MenuItem, GlobalStyles, FormLabel } from "@mui/material"
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { DataGrid, GridColDef, GridRowSelectionModel, GridToolbarColumnsButton } from "@mui/x-data-grid"
 import { useNavigate } from "react-router-dom"
@@ -57,7 +57,7 @@ interface FormValues extends Record<string, unknown> {
     cutoverEndTime?: string;
     postMigrationScript?: string;
     retryOnFailure?: boolean;
-    osType?: string;
+    osFamily?: string;
 }
 
 export interface SelectedMigrationOptionsType extends Record<string, unknown> {
@@ -504,7 +504,7 @@ export default function RollingMigrationFormDrawer({
             );
 
             const filteredVMs = vmsResponse.items.filter((vm: VMwareMachine) => {
-                const clusterLabel = vm.metadata?.labels?.[`vjailbreak.k8s.pf9.io/cluster-name`];
+                const clusterLabel = vm.metadata?.labels?.[`vjailbreak.k8s.pf9.io/vmware-cluster`];
                 return clusterLabel === clusterName;
             });
 
@@ -1319,9 +1319,9 @@ export default function RollingMigrationFormDrawer({
                 const vmId = params.row.id;
                 const isSelected = selectedVMs.includes(vmId);
                 const powerState = params.row?.powerState;
-                const detectedOsType = params.row?.osFamily;
-                const assignedOsType = vmOSAssignments[vmId];
-                const currentOsType = assignedOsType || detectedOsType;
+                const detectedOsFamily = params.row?.osFamily;
+                const assignedOsFamily = vmOSAssignments[vmId];
+                const currentOsFamily = assignedOsFamily || detectedOsFamily;
 
 
                 // Show dropdown for ALL powered-off VMs (allows changing selection)
@@ -1331,10 +1331,10 @@ export default function RollingMigrationFormDrawer({
                             <Select
                                 size="small"
                                 value={(() => {
-                                    if (!currentOsType || currentOsType === "Unknown") return "";
-                                    const osLower = currentOsType.toLowerCase();
-                                    if (osLower.includes("windows")) return "windows";
-                                    if (osLower.includes("linux")) return "linux";
+                                    if (!currentOsFamily || currentOsFamily === "Unknown") return "";
+                                    const osLower = currentOsFamily.toLowerCase();
+                                    if (osLower.includes("windows")) return "windowsGuest";
+                                    if (osLower.includes("linux")) return "linuxGuest";
                                     return "";
                                 })()}
                                 onChange={(e) => handleOSAssignment(vmId, e.target.value)}
@@ -1353,13 +1353,13 @@ export default function RollingMigrationFormDrawer({
                                         <em>Select OS</em>
                                     </Box>
                                 </MenuItem>
-                                <MenuItem value="windows">
+                                <MenuItem value="windowsGuest">
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <img src={WindowsIcon} alt="Windows" style={{ width: 16, height: 16 }} />
                                         Windows
                                     </Box>
                                 </MenuItem>
-                                <MenuItem value="linux">
+                                <MenuItem value="linuxGuest">
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <img src={LinuxIcon} alt="Linux" style={{ width: 16, height: 16 }} />
                                         Linux
@@ -1371,22 +1371,22 @@ export default function RollingMigrationFormDrawer({
                 }
 
                 // Show OS with icon for assigned/detected OS
-                let displayValue = currentOsType || "Unknown";
+                let displayValue = currentOsFamily || "Unknown";
                 let icon: React.ReactNode = null;
 
-                if (currentOsType && currentOsType.toLowerCase().includes("windows")) {
+                if (currentOsFamily && currentOsFamily.toLowerCase().includes("windows")) {
                     displayValue = "Windows";
                     icon = <img src={WindowsIcon} alt="Windows" style={{ width: 20, height: 20 }} />;
-                } else if (currentOsType && currentOsType.toLowerCase().includes("linux")) {
+                } else if (currentOsFamily && currentOsFamily.toLowerCase().includes("linux")) {
                     displayValue = "Linux";
                     icon = <img src={LinuxIcon} alt="Linux" style={{ width: 20, height: 20 }} />;
-                } else if (currentOsType && currentOsType !== "Unknown") {
+                } else if (currentOsFamily && currentOsFamily !== "Unknown") {
                     displayValue = "Other";
                 }
 
                 return (
                     <Tooltip title={powerState === "powered-off" ?
-                        ((!currentOsType || currentOsType === "Unknown") ?
+                        ((!currentOsFamily || currentOsFamily === "Unknown") ?
                             "OS assignment required for powered-off VMs" :
                             "Click to change OS selection") :
                         displayValue}>
@@ -1397,11 +1397,11 @@ export default function RollingMigrationFormDrawer({
                             gap: 1
                         }}>
                             {icon}
-                            {powerState === "powered-off" && (!currentOsType || currentOsType === "Unknown") && (
+                            {powerState === "powered-off" && (!currentOsFamily || currentOsFamily === "Unknown") && (
                                 <WarningIcon sx={{ color: 'warning.main', fontSize: 16 }} />
                             )}
                             <Typography variant="body2" sx={{
-                                color: (!currentOsType || currentOsType === "Unknown") ? 'text.secondary' : 'text.primary'
+                                color: (!currentOsFamily || currentOsFamily === "Unknown") ? 'text.secondary' : 'text.primary'
                             }}>
                                 {displayValue}
                             </Typography>
@@ -1823,44 +1823,6 @@ export default function RollingMigrationFormDrawer({
             >
                 <Header title="Cluster Conversion " />
 
-                {/* Experimental Feature Banner */}
-                <Box sx={{ p: 3, pb: 0 }}>
-                    <Alert
-                        severity="warning"
-                        icon={<WarningIcon />}
-                        sx={{
-                            mb: 2,
-                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                            border: '1px solid rgba(255, 152, 0, 0.3)',
-                            '& .MuiAlert-message': {
-                                width: '100%'
-                            }
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Box>
-                                <Typography variant="body2" fontWeight="600" sx={{ mb: 0.5 }}>
-                                    🧪 Experimental Feature - Cluster Conversion (Beta)
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    This feature is in beta stage and may have significant limitations. Use with caution in production environments.
-                                </Typography>
-                            </Box>
-                            <Link
-                                href="/docs/rolling-migration-beta"
-                                target="_blank"
-                                sx={{
-                                    ml: 2,
-                                    textDecoration: 'none',
-                                    fontWeight: 500,
-                                    fontSize: '0.875rem'
-                                }}
-                            >
-                                Learn More →
-                            </Link>
-                        </Box>
-                    </Alert>
-                </Box>
 
                 <DrawerContent>
                     <Box sx={{ display: "grid", gap: 4 }}>

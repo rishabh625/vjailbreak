@@ -66,10 +66,10 @@ var _ = ginkgo.Describe("MigrationPlan Controller", func() {
 		})
 		ginkgo.It("should successfully reconcile the resource", func() {
 			ginkgo.By("Reconciling the created resource")
-			controllerReconciler := &MigrationPlanReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := NewMigrationPlanReconciler(
+				k8sClient,
+				k8sClient.Scheme(),
+			)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,

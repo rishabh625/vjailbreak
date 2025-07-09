@@ -50,7 +50,7 @@ spec:
             description: Spec defines the desired state of VjailbreakNode
             properties:
               nodeRole:
-                description: NodeRole is the role assigned to the node (e.g., "migration-worker",
+                description: NodeRole is the role assigned to the node (e.g., "worker",
                   "controller")
                 type: string
               openstackCreds:

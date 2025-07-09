@@ -508,6 +508,10 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 		return fmt.Errorf("unsupported OS type: %s", vminfo.OSType)
 	}
 
+	if bootVolumeIndex == -1 {
+		return fmt.Errorf("boot volume not found, cannot create target VM")
+	}
+
 	// save the index of bootVolume
 	utils.PrintLog(fmt.Sprintf("Setting up boot volume as: %s", vminfo.VMDisks[bootVolumeIndex].Name))
 	vminfo.VMDisks[bootVolumeIndex].Boot = true

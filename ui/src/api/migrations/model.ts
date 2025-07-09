@@ -122,6 +122,7 @@ export enum Phase {
   AwaitingAdminCutOver = "AwaitingAdminCutOver",
   Succeeded = "Succeeded",
   Failed = "Failed",
+  Blocked = "Blocked",
   Unknown = "Unknown",
 }
 

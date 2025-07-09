@@ -15,7 +15,7 @@ BUILD_OUTPUT="/tmp/swagger-ui-build"
 rm -rf "$BUILD_OUTPUT"
 mkdir -p "$BUILD_OUTPUT"
 
-for TAG in $(git tag --sort=-creatordate); do
+for TAG in $(git tag --sort=-creatordate | head -n 5); do
   git stash --include-untracked
   git checkout $TAG
 

@@ -7,8 +7,7 @@ import {
     styled,
     Button,
     LinearProgress,
-    IconButton,
-    Tooltip
+    IconButton
 } from "@mui/material";
 import {
     DataGrid,
@@ -383,19 +382,6 @@ const CustomToolbar = ({ refetchClusterMigrations, selectedCount, onDeleteSelect
                     <Typography variant="h6" component="h2">
                         Cluster Conversions
                     </Typography>
-                    <Tooltip title="Early preview - report any issues" arrow>
-                        <Chip
-                            label="BETA"
-                            size="small"
-                            color="warning"
-                            variant="outlined"
-                            sx={{
-                                fontSize: '0.65rem',
-                                height: '18px',
-                                fontWeight: 600
-                            }}
-                        />
-                    </Tooltip>
                 </Box>
                 {selectedCount > 0 && (
                     <Typography variant="body2" color="text.secondary">

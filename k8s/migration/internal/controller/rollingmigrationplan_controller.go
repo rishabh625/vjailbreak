@@ -43,6 +43,7 @@ type RollingMigrationPlanReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Logger logr.Logger
+	Local  bool
 }
 
 // +kubebuilder:rbac:groups=vjailbreak.k8s.pf9.io,resources=rollingmigrationplans,verbs=get;list;watch;create;update;patch;delete
@@ -120,13 +121,48 @@ func (r *RollingMigrationPlanReconciler) reconcileNormal(ctx context.Context, sc
 		return ctrl.Result{}, nil
 	}
 
+	// check and create default validation configmap
+	configMap, err := utils.GetValidationConfigMapForRollingMigrationPlan(ctx, r.Client, migrationPlan)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("Validation configmap not found, creating default validation configmap")
+			if _, err := utils.CreateDefaultValidationConfigMapForRollingMigrationPlan(ctx, r.Client, migrationPlan); err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to create default validation configmap")
+			}
+		}
+	}
+	if configMap == nil {
+		configMap, err = utils.GetValidationConfigMapForRollingMigrationPlan(ctx, r.Client, migrationPlan)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to get validation configmap for rolling migration plan")
+		}
+	}
+
+	// Do not validate if the rolling migration plan has already started running
+	if migrationPlan.Status.Phase != vjailbreakv1alpha1.RollingMigrationPlanPhaseRunning {
+		valid, message, err := utils.ValidateRollingMigrationPlan(ctx, scope, configMap)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to validate rolling migration plan")
+		}
+
+		if !valid {
+			log.Info(fmt.Sprintf("RollingMigrationPlan %s is not valid: %s, requeueing after 1 minute", migrationPlan.Name, message))
+			migrationPlan.Status.Message = message
+			migrationPlan.Status.Phase = vjailbreakv1alpha1.RollingMigrationPlanPhaseValidationFailed
+			if err := r.Status().Update(ctx, migrationPlan); err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to update rolling migration plan")
+			}
+			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+		}
+	}
+
 	if err := utils.ResumeRollingMigrationPlan(ctx, scope); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "failed to resume rolling migration plan")
 	}
 
 	if migrationPlan.Spec.CloudInitConfigRef == nil {
 		log.Info("CloudInitConfigRef is not set")
-		err := utils.MergeCloudInitAndCreateSecret(ctx, scope)
+		err := utils.MergeCloudInitAndCreateSecret(ctx, scope, r.Local)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to merge cloud-init config and create secret")
 		}
@@ -219,6 +255,20 @@ func (r *RollingMigrationPlanReconciler) reconcileDelete(ctx context.Context, sc
 		if delErr := r.Delete(ctx, migrationTemplate); delErr != nil {
 			log.Error(delErr, "Failed to delete MigrationTemplate", "vm", scope.RollingMigrationPlan.Spec.MigrationTemplate)
 			return ctrl.Result{}, errors.Wrap(delErr, "failed to delete migration template")
+		}
+	}
+
+	// Delete validation configmap
+	validationConfigMap, err := utils.GetValidationConfigMapForRollingMigrationPlan(ctx, r.Client, scope.RollingMigrationPlan)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Failed to get validation configmap", "rollingmigrationplan", scope.RollingMigrationPlan.Name)
+			return ctrl.Result{}, errors.Wrap(err, "failed to get validation configmap")
+		}
+	} else {
+		if delErr := r.Delete(ctx, validationConfigMap); delErr != nil {
+			log.Error(delErr, "Failed to delete validation configmap", "rollingmigrationplan", scope.RollingMigrationPlan.Name)
+			return ctrl.Result{}, errors.Wrap(delErr, "failed to delete validation configmap")
 		}
 	}
 

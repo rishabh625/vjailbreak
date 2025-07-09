@@ -6,7 +6,7 @@ metadata:
 spec:
   networkMapping: networkmapping 
   storageMapping: storagemapping
-  osType: windows 
+  osFamily: windowsGuest
   source:
     datacenter: Datacenter Name 
     vmwareRef: vmwarecreds

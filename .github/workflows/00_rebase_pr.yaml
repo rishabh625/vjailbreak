@@ -15,17 +15,23 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    outputs:
+      is_rebase: ${{ steps.check-rebase.outputs.is_rebase }}
     steps:
-      - name: What was the comment
+      - name: Check comment is rebase
+        if: ${{ github.event.issue.pull_request }} && startsWith(github.event.comment.body || '', '/rebase')
+        id: check-rebase
         run: |
-         echo "Comment: $COMMENT_BODY"
+          echo "User Comment: $COMMENT_BODY"
+          echo "is_rebase=true" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            COMMENT_BODY: ${{ github.event.comment.body }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   rebase:
-    if: ${{ github.event.issue.pull_request }} && startsWith(github.event.comment.body, '/rebase')
+    needs: check-comment
+    if: ${{ needs.check-comment.outputs.is_rebase }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,13 +71,12 @@ jobs:
           LATEST_BRANCH=$(git branch -r | grep 'origin/release-v' | sed 's/origin\///' | sort -V | tail -n 1)
           echo "Latest release branch: $LATEST_BRANCH"
           echo "latest_branch=$LATEST_BRANCH" >> $GITHUB_OUTPUT
-          echo "::set-output name=latest_branch::$LATEST_BRANCH"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rebase current PR onto latest release branch
-        if: steps.check-permissions.outputs.is_authorized == 'true'
+        if: ${{ needs.check-comment.outputs.is_rebase }} && steps.check-permissions.outputs.is_authorized == 'true'
         run: |
           # Configure Git
           git config --global user.email "github-actions[bot]@users.noreply.github.com"

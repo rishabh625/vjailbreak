@@ -530,6 +530,51 @@ spec:
               MigrationPlanStatus defines the observed state of MigrationPlan including
               the current status and progress of the migration
             properties:
+              conditions:
+                description: Conditions represents the current state of the migration
+                items:
+                  description: PodCondition contains details for the current condition
+                    of this pod.
+                  properties:
+                    lastProbeTime:
+                      description: Last time we probed the condition.
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        If set, this represents the .metadata.generation that the pod condition was set based upon.
+                        This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: Unique, one-word, CamelCase reason for the condition's
+                        last transition.
+                      type: string
+                    status:
+                      description: |-
+                        Status is the status of the condition.
+                        Can be True, False, Unknown.
+                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+                      type: string
+                    type:
+                      description: |-
+                        Type is the type of the condition.
+                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
               migrationMessage:
                 description: MigrationMessage is the message associated with the migration
                 type: string
@@ -1724,7 +1769,7 @@ spec:
             description: Spec defines the desired state of VjailbreakNode
             properties:
               nodeRole:
-                description: NodeRole is the role assigned to the node (e.g., "migration-worker",
+                description: NodeRole is the role assigned to the node (e.g., "worker",
                   "controller")
                 type: string
               openstackCreds:
@@ -2141,6 +2186,12 @@ spec:
                   ipAddress:
                     description: IPAddress is the IP address of the virtual machine
                     type: string
+                  macAddresses:
+                    description: MacAddresses is the list of MAC addresses assigned
+                      to the VM's network interfaces
+                    items:
+                      type: string
+                    type: array
                   memory:
                     description: Memory is the amount of memory in the virtual machine
                     type: integer
@@ -2156,6 +2207,47 @@ spec:
                   osFamily:
                     description: OSFamily is the OS family of the virtual machine
                     type: string
+                  rdmDisks:
+                    description: RDMDisks is the list of RDM disks for the virtual
+                      machine
+                    items:
+                      description: RDMDiskInfo contains information about a Raw Device
+                        Mapping (RDM) disk
+                      properties:
+                        diskName:
+                          description: DiskName is the name of the disk
+                          type: string
+                        diskSize:
+                          description: DiskSize is the size of the disk in GB
+                          format: int64
+                          type: integer
+                        displayName:
+                          description: DisplayName is the display name of the disk
+                          type: string
+                        openstackVolumeRef:
+                          description: OpenstackVolumeRef contains OpenStack volume
+                            reference information
+                          properties:
+                            cinderBackendPool:
+                              description: CinderBackendPool is the cinder backend
+                                pool of the disk
+                              type: string
+                            volumeRef:
+                              additionalProperties:
+                                type: string
+                              description: VolumeRef is the reference to the OpenStack
+                                volume
+                              type: object
+                            volumeType:
+                              description: VolumeType is the volume type of the disk
+                              type: string
+                          type: object
+                        uuid:
+                          description: UUID (VML id) is the unique identifier of the
+                            disk
+                          type: string
+                      type: object
+                    type: array
                   vmState:
                     description: VMState is the state of the virtual machine
                     type: string
@@ -3288,7 +3380,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/platform9/vjailbreak-controller:v0.1.15
+        image: quay.io/platform9/vjailbreak-controller:v0.2.0
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
@@ -3319,6 +3411,8 @@ spec:
           name: master-token
         - mountPath: /home/ubuntu
           name: vddk
+        - mountPath: /etc/hosts
+          name: hosts-file
       hostNetwork: true
       securityContext:
         runAsGroup: 0
@@ -3334,6 +3428,10 @@ spec:
           path: /home/ubuntu
           type: Directory
         name: vddk
+      - hostPath:
+          path: /etc/hosts
+          type: File
+        name: hosts-file
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -3360,7 +3458,7 @@ spec:
         app: vpwned-sdk
     spec:
       containers:
-      - image: quay.io/platform9/vjailbreak-vpwned:v0.1.15
+      - image: quay.io/platform9/vjailbreak-vpwned:v0.2.0
         imagePullPolicy: IfNotPresent
         name: vpwned
         ports:
@@ -3369,11 +3467,20 @@ spec:
         resources: {}
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/hosts
+          name: hosts-file
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}
       terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /etc/hosts
+          type: File
+        name: hosts-file
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

@@ -33,19 +33,6 @@ import (
 	openstackutils "github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 )
 
-// Network represents network configuration for OpenStack VMs
-type Network struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	Link      string `json:"link"`
-	NetworkID string `json:"network_id"`
-}
-
-// OpenStackMetadata represents metadata for OpenStack VMs
-type OpenStackMetadata struct {
-	Networks []Network `json:"networks"`
-}
-
 // CheckAndCreateMasterNodeEntry ensures a master node entry exists and creates it if needed
 func CheckAndCreateMasterNodeEntry(ctx context.Context, k3sclient client.Client, local bool) error {
 	var openstackuuid string

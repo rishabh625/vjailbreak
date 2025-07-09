@@ -100,7 +100,7 @@ export const useClusterData = (
         const clusters = clustersResponse.items.map(
           (cluster: VMwareCluster) => ({
             id: `${credName}:${cluster.metadata.name}`,
-            name: cluster.spec.name,
+            name: cluster.metadata.name,
           })
         )
 
