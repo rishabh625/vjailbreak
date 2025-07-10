@@ -55,8 +55,9 @@ type OpenStackCredsInfo struct {
 
 // OpenstackInfo contains information about OpenStack environment resources including available volume types and networks
 type OpenstackInfo struct {
-	VolumeTypes []string `json:"volumeTypes,omitempty"`
-	Networks    []string `json:"networks,omitempty"`
+	VolumeTypes    []string `json:"volumeTypes,omitempty"`
+	VolumeBackends []string `json:"volumeBackends,omitempty"`
+	Networks       []string `json:"networks,omitempty"`
 }
 
 // OpenstackCredsSpec defines the desired state of OpenstackCreds
