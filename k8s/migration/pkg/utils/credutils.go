@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	gophercloud "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -562,18 +563,34 @@ func ValidateAndGetProviderClient(ctx context.Context, k3sclient client.Client,
 	}
 	providerClient.HTTPClient = http.Client{
 		Transport: transport,
+		Timeout:   60 * time.Second,
 	}
-	err = openstack.Authenticate(providerClient, gophercloud.AuthOptions{
+	authOpts := gophercloud.AuthOptions{
 		IdentityEndpoint: openstackCredential.AuthURL,
 		Username:         openstackCredential.Username,
 		Password:         openstackCredential.Password,
 		DomainName:       openstackCredential.DomainName,
 		TenantName:       openstackCredential.TenantName,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to authenticate to openstack")
 	}
-
+	if err := openstack.Authenticate(providerClient, authOpts); err != nil {
+		switch {
+		case strings.Contains(err.Error(), "401"):
+			return nil, fmt.Errorf("authentication failed: invalid username, password, or project/domain. Please verify your credentials")
+		case strings.Contains(err.Error(), "404"):
+			return nil, fmt.Errorf("authentication failed: the authentication URL or tenant/project name is incorrect")
+		case strings.Contains(err.Error(), "timeout"):
+			return nil, fmt.Errorf("connection timeout: unable to reach the OpenStack authentication service. Please check your network connection and Auth URL")
+		default:
+			return nil, fmt.Errorf("authentication failed: %w. Please verify your OpenStack credentials", err)
+		}
+	}
+	_, err = VerifyCredentialsMatchCurrentEnvironment(providerClient)
+	if err != nil {
+		if strings.Contains(err.Error(), "Credentials are valid but for a different OpenStack environment") {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed to verify credentials against current environment: %w", err)
+	}
 	return providerClient, nil
 }
 
@@ -1356,7 +1373,7 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 					}
 					mp := make(map[string]string)
 					mp[splotVolRef[0]] = splotVolRef[1]
-					fmt.Println("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
+					log.Info("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
 					rdmInfo.OpenstackVolumeRef = vjailbreakv1alpha1.OpenStackVolumeRefInfo{
 						VolumeRef: mp,
 					}

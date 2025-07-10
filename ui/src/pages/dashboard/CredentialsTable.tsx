@@ -15,6 +15,7 @@ import {
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import AddIcon from '@mui/icons-material/Add';
+import CredentialsIcon from '@mui/icons-material/VpnKey';
 import CustomSearchToolbar from "src/components/grid/CustomSearchToolbar";
 import { useState, useCallback, useEffect } from "react";
 import { useVmwareCredentialsQuery } from "src/hooks/api/useVmwareCredentialsQuery";
@@ -27,6 +28,7 @@ import { VMWARE_CREDS_QUERY_KEY } from "src/hooks/api/useVmwareCredentialsQuery"
 import { OPENSTACK_CREDS_QUERY_KEY } from "src/hooks/api/useOpenstackCredentialsQuery";
 import { deleteVMwareCredsWithSecretFlow, deleteOpenStackCredsWithSecretFlow } from "src/api/helpers";
 import VMwareCredentialsDrawer from "src/components/drawers/VMwareCredentialsDrawer";
+import { useErrorHandler } from "src/hooks/useErrorHandler";
 import OpenstackCredentialsDrawer from "src/components/drawers/OpenstackCredentialsDrawer";
 
 interface CredentialItem {
@@ -118,11 +120,12 @@ const CustomToolbar = ({
                 alignItems: 'center'
             }}
         >
-            <div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CredentialsIcon />
                 <Typography variant="h6" component="h2">
                     Credentials
                 </Typography>
-            </div>
+            </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
                     variant="outlined"
@@ -164,6 +167,7 @@ const CustomToolbar = ({
 };
 
 export default function CredentialsTable() {
+    const { reportError } = useErrorHandler({ component: "CredentialsTable" });
     const queryClient = useQueryClient();
 
     // Fetch credentials with options to always get fresh data
@@ -271,6 +275,14 @@ export default function CredentialsTable() {
             handleDeleteClose();
         } catch (error) {
             console.error("Error deleting credentials:", error);
+            reportError(error as Error, {
+                context: 'credentials-deletion',
+                metadata: {
+                    selectedIds: selectedIds,
+                    credentialsCount: selectedIds.length,
+                    action: 'delete-credentials'
+                }
+            });
             setDeleteError(error instanceof Error ? error.message : "Unknown error occurred");
         } finally {
             setDeleting(false);

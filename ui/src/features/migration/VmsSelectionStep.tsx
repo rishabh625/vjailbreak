@@ -33,6 +33,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import WarningIcon from "@mui/icons-material/Warning";
 import WindowsIcon from "src/assets/windows_icon.svg";
 import LinuxIcon from "src/assets/linux_icon.svg";
+import { useErrorHandler } from "src/hooks/useErrorHandler";
 
 const VmsSelectionStepContainer = styled("div")(({ theme }) => ({
   display: "grid",
@@ -240,6 +241,7 @@ export default function VmsSelectionStep({
   vmwareCredName,
   openstackCredName,
 }: VmsSelectionStepProps) {
+  const { reportError } = useErrorHandler({ component: "VmsSelectionStep" });
   const [migratedVms, setMigratedVms] = useState<Set<string>>(new Set());
   const [loadingMigratedVms, setLoadingMigratedVms] = useState(false);
   const [flavorDialogOpen, setFlavorDialogOpen] = useState(false);
@@ -389,6 +391,15 @@ export default function VmsSelectionStep({
       handleCloseFlavorDialog();
     } catch (error) {
       console.error("Error updating VM flavors:", error);
+      reportError(error as Error, {
+        context: 'vm-flavors-update',
+        metadata: {
+          selectedVMs: Array.from(rowSelectionModel),
+          selectedFlavor: selectedFlavor,
+          isAutoAssign: selectedFlavor === "auto-assign",
+          action: 'vm-flavors-bulk-update'
+        }
+      });
       setSnackbarMessage("Failed to assign flavor to VMs");
       setSnackbarSeverity("error");
       setSnackbarOpen(true);

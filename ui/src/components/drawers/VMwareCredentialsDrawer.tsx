@@ -14,6 +14,7 @@ import { getVmwareCredentials } from "src/api/vmware-creds/vmwareCreds";
 import { useInterval } from "src/hooks/useInterval";
 import { THREE_SECONDS } from "src/constants";
 import { useKeyboardSubmit } from "src/hooks/ui/useKeyboardSubmit";
+import { useErrorHandler } from "src/hooks/useErrorHandler";
 
 interface VMwareCredentialsDrawerProps {
     open: boolean;
@@ -24,6 +25,7 @@ export default function VMwareCredentialsDrawer({
     open,
     onClose,
 }: VMwareCredentialsDrawerProps) {
+    const { reportError } = useErrorHandler({ component: "VMwareCredentialsDrawer" });
     const [validatingVmwareCreds, setValidatingVmwareCreds] = useState(false);
     const [vmwareCredsValidated, setVmwareCredsValidated] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -125,6 +127,15 @@ export default function VMwareCredentialsDrawer({
             setVmwareCredsValidated(false);
             setValidatingVmwareCreds(false);
             setError(message || "Validation failed");
+            
+            reportError(new Error(`VMware credential validation failed: ${message || "Unknown reason"}`), {
+                context: 'vmware-validation-failure',
+                metadata: {
+                    credentialName: createdCredentialName,
+                    validationMessage: message,
+                    action: 'vmware-validation-failed'
+                }
+            });
 
             // Try to delete the failed credential to clean up
             if (createdCredentialName) {
@@ -134,6 +145,13 @@ export default function VMwareCredentialsDrawer({
                         .catch((deleteErr) => console.error(`Error deleting failed credential: ${createdCredentialName}`, deleteErr));
                 } catch (deleteErr) {
                     console.error(`Error deleting failed credential: ${createdCredentialName}`, deleteErr);
+                    reportError(deleteErr as Error, {
+                        context: 'vmware-credential-deletion',
+                        metadata: {
+                            credentialName: createdCredentialName,
+                            action: 'delete-failed-credential'
+                        }
+                    });
                 }
             }
         }
@@ -152,6 +170,13 @@ export default function VMwareCredentialsDrawer({
                 }
             } catch (err) {
                 console.error("Error validating VMware credentials", err);
+                reportError(err as Error, {
+                    context: 'vmware-validation-polling',
+                    metadata: {
+                        credentialName: createdCredentialName,
+                        action: 'vmware-validation-status-polling'
+                    }
+                });
                 setError("Error validating VMware credentials");
                 setValidatingVmwareCreds(false);
                 setSubmitting(false);
@@ -192,6 +217,15 @@ export default function VMwareCredentialsDrawer({
             setCreatedCredentialName(response.metadata.name);
         } catch (error) {
             console.error("Error creating VMware credentials:", error);
+            reportError(error as Error, {
+                context: 'vmware-credential-creation',
+                metadata: {
+                    credentialName: formValues.credentialName,
+                    vcenterHost: formValues.vcenterHost,
+                    username: formValues.username,
+                    action: 'create-vmware-credential'
+                }
+            });
             setVmwareCredsValidated(false);
             setValidatingVmwareCreds(false);
             setError(

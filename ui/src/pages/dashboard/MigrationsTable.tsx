@@ -1,6 +1,7 @@
 import { DataGrid, GridColDef, GridRowSelectionModel, GridToolbarContainer } from "@mui/x-data-grid";
 import { Button, Typography, Box, IconButton, Tooltip } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
+import MigrationIcon from '@mui/icons-material/SwapHoriz';
 import { useState } from "react";
 import CustomSearchToolbar from "src/components/grid/CustomSearchToolbar";
 import { Condition, Migration, Phase } from "src/api/migrations/model";
@@ -172,11 +173,12 @@ const CustomToolbar = ({ numSelected, onDeleteSelected, refetchMigrations }: Cus
                 alignItems: 'center'
             }}
         >
-            <div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <MigrationIcon />
                 <Typography variant="h6" component="h2">
                     Migrations
                 </Typography>
-            </div>
+            </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
                 {numSelected > 0 && (
                     <Button

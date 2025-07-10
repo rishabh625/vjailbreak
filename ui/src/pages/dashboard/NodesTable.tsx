@@ -17,6 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import WarningIcon from '@mui/icons-material/Warning';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import AgentsIcon from '@mui/icons-material/Computer';
 import CustomSearchToolbar from "src/components/grid/CustomSearchToolbar";
 import { useState } from "react";
 import ScaleUpDrawer from "./ScaleUpDrawer";
@@ -26,6 +27,7 @@ import { deleteNode } from "src/api/nodes/nodeMappings";
 import { useQueryClient } from "@tanstack/react-query";
 import { NODES_QUERY_KEY } from "src/hooks/api/useNodesQuery";
 import { NodeItem } from "src/api/nodes/model";
+import { useErrorHandler } from "src/hooks/useErrorHandler";
 import { intervalToDuration } from 'date-fns';
 
 // Update helper for formatting duration
@@ -197,11 +199,12 @@ const NodesToolbar = ({
                 alignItems: 'center'
             }}
         >
-            <div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AgentsIcon />
                 <Typography variant="h6" component="h2">
                     Agents
                 </Typography>
-            </div>
+            </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
                 <Tooltip title={loading ? "Operation in progress" : ""}>
                     <span> {/* Wrapper needed for disabled button tooltip */}
@@ -241,6 +244,7 @@ const NodesToolbar = ({
 };
 
 export default function NodesTable() {
+    const { reportError } = useErrorHandler({ component: "NodesTable" });
     const { data: nodes, isLoading: fetchingNodes, refetch: refreshNodes } = useNodesQuery();
     const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
     const [scaleUpOpen, setScaleUpOpen] = useState(false);
@@ -304,6 +308,14 @@ export default function NodesTable() {
 
         } catch (error) {
             console.error('Error scaling down nodes:', error);
+            reportError(error as Error, {
+                context: 'nodes-scale-down',
+                metadata: {
+                    selectedNodes: selectedNodes,
+                    nodesCount: selectedNodes.length,
+                    action: 'scale-down-nodes'
+                }
+            });
             setScaleDownError('Failed to scale down nodes. Please try again.');
         } finally {
             setLoading(false);

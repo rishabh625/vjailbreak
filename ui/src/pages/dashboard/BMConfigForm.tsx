@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import CodeMirror from '@uiw/react-codemirror';
+import { useErrorHandler } from "../../hooks/useErrorHandler";
 import { yaml } from '@codemirror/lang-yaml';
 import { EditorView } from '@codemirror/view';
 import { createBmconfigSecret, deleteSecret, getSecret } from '../../api/secrets/secrets';
@@ -73,6 +74,7 @@ const CodeMirrorContainer = styled(Box)(({ theme }) => ({
 }));
 
 export default function MaasConfigForm() {
+    const { reportError } = useErrorHandler({ component: "BMConfigForm" });
     const defaultCloudInit = `#cloud-config
 
 # Run the cloud-init script on boot
@@ -350,6 +352,16 @@ runcmd:
             });
         } catch (error) {
             console.error('Error submitting form:', error);
+            reportError(error as Error, {
+                context: 'maas-config-submission',
+                metadata: {
+                    configName: formData.configName,
+                    maasUrl: formData.maasUrl,
+                    os: formData.os,
+                    namespace: formData.namespace,
+                    action: 'create-maas-config'
+                }
+            });
             setNotification({
                 open: true,
                 message: 'Failed to save MaasConfig',

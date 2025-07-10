@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import axios from 'axios';
 import { useState, useRef, useCallback } from "react";
 import { StyledDrawer, DrawerContent } from "src/components/forms/StyledDrawer";
 import Header from "src/components/forms/Header";
@@ -13,6 +14,7 @@ import { isValidName } from "src/utils";
 import CheckIcon from "@mui/icons-material/Check";
 import OpenstackRCFileUploader, { OpenstackRCFileUploaderRef } from "src/components/forms/OpenstackRCFileUpload";
 import { useKeyboardSubmit } from "src/hooks/ui/useKeyboardSubmit";
+import { useErrorHandler } from "src/hooks/useErrorHandler";
 
 interface OpenstackCredentialsDrawerProps {
     open: boolean;
@@ -23,6 +25,7 @@ export default function OpenstackCredentialsDrawer({
     open,
     onClose,
 }: OpenstackCredentialsDrawerProps) {
+    const { reportError } = useErrorHandler({ component: "OpenstackCredentialsDrawer" });
     const [validatingOpenstackCreds, setValidatingOpenstackCreds] = useState(false);
     const [openstackCredsValidated, setOpenstackCredsValidated] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +92,17 @@ export default function OpenstackCredentialsDrawer({
         setError(null);
     };
 
+    const getApiErrorMessage = (error: unknown): string => {
+        if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
+            return error.response.data.message;
+        }
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return "An unknown error occurred. Please try again.";
+    };
+
+
     const handleSubmit = useCallback(async () => {
         if (!credentialName || !rcFileValues) {
             setError("Please provide a credential name and upload an RC file");
@@ -102,6 +116,7 @@ export default function OpenstackCredentialsDrawer({
 
         setSubmitting(true);
         setValidatingOpenstackCreds(true);
+        setError(null);
 
         try {
             // Use the new helper function that encapsulates the entire flow
@@ -123,17 +138,19 @@ export default function OpenstackCredentialsDrawer({
 
         } catch (error: unknown) {
             console.error("Error creating OpenStack credentials:", error);
+            reportError(error as Error, {
+                context: 'openstack-credential-creation',
+                metadata: {
+                    credentialName: credentialName,
+                    isPcd: isPcd,
+                    action: 'create-openstack-credential'
+                }
+            });
             setOpenstackCredsValidated(false);
             setValidatingOpenstackCreds(false);
 
-            // Handle different error types
-            const errorMessage = error instanceof Error
-                ? error.message
-                : (typeof error === 'object' && error !== null && 'response' in error && typeof error.response === 'object' && error.response !== null && 'data' in error.response && typeof error.response.data === 'object' && error.response.data !== null && 'message' in error.response.data)
-                    ? String(error.response.data.message)
-                    : String(error);
-
-            setError("Error creating OpenStack credentials: " + errorMessage);
+            const errorMessage = getApiErrorMessage(error);
+            setError(errorMessage);
             setSubmitting(false);
         }
     }, [credentialName, rcFileValues, isValidCredentialName, submitting, isPcd]);
@@ -159,6 +176,15 @@ export default function OpenstackCredentialsDrawer({
             setOpenstackCredsValidated(false);
             setValidatingOpenstackCreds(false);
             setError(message || "Validation failed");
+            
+            reportError(new Error(`OpenStack credential validation failed: ${message || "Unknown reason"}`), {
+                context: 'openstack-validation-failure',
+                metadata: {
+                    credentialName: createdCredentialName,
+                    validationMessage: message,
+                    action: 'openstack-validation-failed'
+                }
+            });
 
             // Try to delete the failed credential to clean up
             if (createdCredentialName) {
@@ -168,6 +194,13 @@ export default function OpenstackCredentialsDrawer({
                         .catch((deleteErr) => console.error(`Error deleting failed credential: ${createdCredentialName}`, deleteErr));
                 } catch (deleteErr) {
                     console.error(`Error deleting failed credential: ${createdCredentialName}`, deleteErr);
+                    reportError(deleteErr as Error, {
+                        context: 'openstack-credential-deletion',
+                        metadata: {
+                            credentialName: createdCredentialName,
+                            action: 'delete-failed-credential'
+                        }
+                    });
                 }
             }
         }
@@ -192,6 +225,13 @@ export default function OpenstackCredentialsDrawer({
                 }
             } catch (err) {
                 console.error("Error validating OpenStack credentials", err);
+                reportError(err as Error, {
+                    context: 'openstack-validation-polling',
+                    metadata: {
+                        credentialName: createdCredentialName,
+                        action: 'openstack-validation-status-polling'
+                    }
+                });
                 setError("Error validating OpenStack credentials");
                 setValidatingOpenstackCreds(false);
                 setSubmitting(false);

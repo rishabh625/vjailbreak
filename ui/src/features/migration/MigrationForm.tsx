@@ -1,4 +1,5 @@
 import { Box, Drawer, styled } from "@mui/material"
+import MigrationIcon from "@mui/icons-material/SwapHoriz"
 import { useQueryClient } from "@tanstack/react-query"
 import axios from "axios"
 import { useEffect, useMemo, useState, useCallback } from "react"
@@ -47,6 +48,7 @@ import { uniq } from "ramda"
 import { flatten } from "ramda"
 import { useKeyboardSubmit } from "src/hooks/ui/useKeyboardSubmit"
 import { useClusterData } from "./useClusterData"
+import { useErrorHandler } from "src/hooks/useErrorHandler"
 
 const stringsCompareFn = (a, b) =>
   a.toLowerCase().localeCompare(b.toLowerCase())
@@ -163,6 +165,7 @@ export default function MigrationFormDrawer({
   const navigate = useNavigate()
   const { params, getParamsUpdater } = useParams<FormValues>(defaultValues)
   const { pcdData } = useClusterData()
+  const { reportError } = useErrorHandler({ component: "MigrationForm" })
   const [error, setError] = useState<{ title: string; message: string } | null>(
     null
   )
@@ -370,6 +373,13 @@ export default function MigrationFormDrawer({
       return data
     } catch (err) {
       console.error("Error creating storage mapping", err)
+      reportError(err as Error, {
+        context: 'storage-mapping-creation',
+        metadata: {
+          storageMappingsParams: storageMappingsParams,
+          action: 'create-storage-mapping'
+        }
+      })
       setError({
         title: "Error creating storage mapping",
         message: axios.isAxiosError(err) ? err?.response?.data?.message : "",
@@ -471,6 +481,13 @@ export default function MigrationFormDrawer({
       return data;
     } catch (error: unknown) {
       console.error("Error creating migration plan", error);
+      reportError(error as Error, {
+        context: 'migration-plan-creation',
+        metadata: {
+          migrationFields: migrationFields,
+          action: 'create-migration-plan'
+        }
+      });
 
       let errorMessage = "An unknown error occurred";
       let errorResponse: {
@@ -650,6 +667,15 @@ export default function MigrationFormDrawer({
 
     } catch (err) {
       console.error("Error cleaning up resources", err)
+      reportError(err as Error, {
+        context: 'resource-cleanup',
+        metadata: {
+          migrationTemplateName: migrationTemplate?.metadata?.name,
+          vmwareCredentialsName: vmwareCredentials?.metadata?.name,
+          openstackCredentialsName: openstackCredentials?.metadata?.name,
+          action: 'cleanup-resources'
+        }
+      })
       onClose()
     }
   }, [migrationTemplate, vmwareCredentials, openstackCredentials, queryClient, sessionId, onClose, params.vmwareCreds, params.openstackCreds])
@@ -669,7 +695,7 @@ export default function MigrationFormDrawer({
       onClose={handleClose}
       ModalProps={{ keepMounted: false }}
     >
-      <Header title="Migration Form" />
+      <Header title="Migration Form" icon={<MigrationIcon />} />
       <DrawerContent>
         <Box sx={{ display: "grid", gap: 4 }}>
           {/* Step 1 */}

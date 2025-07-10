@@ -116,7 +116,8 @@ func TestGetVMInfo(t *testing.T) {
 		Name:   "DC0_H0_VM0",
 		OSType: "linux",
 	}
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	vminfo, err := vmops.GetVMInfo("linux")
 	assert.NoError(t, err)
@@ -129,7 +130,8 @@ func TestEnableCBT(t *testing.T) {
 	assert.Nil(t, err)
 
 	vmName := "DC0_H0_VM0"
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	err = vmops.EnableCBT()
 	assert.NoError(t, err)
@@ -141,7 +143,8 @@ func TestIsCBTEnabled(t *testing.T) {
 	assert.Nil(t, err)
 
 	vmName := "DC0_H0_VM0"
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	_ = vmops.EnableCBT()
 	enabled, err := vmops.IsCBTEnabled()
@@ -155,7 +158,8 @@ func TestTakeSnapshot(t *testing.T) {
 	assert.Nil(t, err)
 
 	vmName := "DC0_H0_VM0"
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	snapshotName := "snapshot-1"
 	err = vmops.TakeSnapshot(snapshotName)
@@ -168,7 +172,8 @@ func TestDeleteSnapshot(t *testing.T) {
 	assert.Nil(t, err)
 
 	vmName := "DC0_H0_VM0"
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	snapshotName := "snapshot-1"
 	_ = vmops.TakeSnapshot(snapshotName)
@@ -182,7 +187,8 @@ func TestGetSnapshot(t *testing.T) {
 	assert.Nil(t, err)
 
 	vmName := "DC0_H0_VM0"
-	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName)
+	// TODO: Add client  to VMOpsBuilder
+	vmops, _ := VMOpsBuilder(context.Background(), *simVC, vmName, nil)
 
 	snapshotName := "snapshot-1"
 	_ = vmops.TakeSnapshot(snapshotName)

@@ -71,11 +71,6 @@ func (r *VjailbreakNodeReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, errors.Wrap(err, "failed to create vjailbreak node scope")
 	}
 
-	err = utils.AddFinalizerToCreds(ctx, r.Client)
-	if err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "failed to add finalizer to openstack creds")
-	}
-
 	// Always close the scope when exiting this function such that we can persist any VjailbreakNode changes.
 	defer func() {
 		if err := vjailbreakNodeScope.Close(); err != nil && reterr == nil {
@@ -199,15 +194,7 @@ func (r *VjailbreakNodeReconciler) reconcileDelete(ctx context.Context,
 	log.Info("Reconciling VjailbreakNode Delete")
 
 	if scope.VjailbreakNode.Spec.NodeRole == constants.NodeRoleMaster {
-		log.Info("Skipping master node deletion")
-
 		controllerutil.RemoveFinalizer(scope.VjailbreakNode, constants.VjailbreakNodeFinalizer)
-
-		// Remove finalizer from openstack creds
-		err := utils.DeleteFinalizerFromCreds(ctx, r.Client)
-		if err != nil {
-			return ctrl.Result{}, errors.Wrap(err, "failed to remove finalizer from openstack creds")
-		}
 		return ctrl.Result{}, nil
 	}
 

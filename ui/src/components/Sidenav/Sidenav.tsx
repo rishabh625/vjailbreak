@@ -9,14 +9,16 @@ import {
   Box,
   Chip,
   Tooltip,
+  Divider,
   styled,
   alpha
 } from '@mui/material'
-import { ChevronLeft, ChevronRight } from '@mui/icons-material'
+import { ChevronLeft, ChevronRight, OpenInNew } from '@mui/icons-material'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { NavigationItem, SidenavProps } from '../../types/navigation'
 import { useVersionQuery } from '../../hooks/api/useVersionQuery'
+import Platform9Logo from '../Platform9Logo'
 
 
 const DRAWER_WIDTH = 280
@@ -61,7 +63,7 @@ const StyledDrawer = styled(Drawer, {
     overflowX: 'hidden',
     overflowY: 'hidden',
     borderRight: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.background.default,
     '&::-webkit-scrollbar': {
       display: 'none',
     },
@@ -81,25 +83,24 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   marginBottom: theme.spacing(1),
 }))
 
-const BrandContainer = styled(Box)(() => ({
+const BrandContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'collapsed'
+})<{ collapsed?: boolean }>(({ theme, collapsed }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
+  justifyContent: collapsed ? 'center' : 'flex-start',
   width: '100%',
+  paddingLeft: collapsed ? 0 : theme.spacing(2),
+  transition: theme.transitions.create(['justify-content', 'padding-left'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
 }))
 
-const BrandText = styled(Box)(({ theme }) => ({
-  fontWeight: 700,
-  fontSize: '1.5rem',
-  // color: theme.palette.primary.main,
-  // fontFamily: 'system-ui, -apple-system, sans-serif',
-  background: theme.palette.primary.main,
-  backgroundClip: 'text',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-}))
 
-const VersionBadge = styled(Box)(({ theme }) => ({
+const VersionBadge = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'collapsed'
+})<{ collapsed?: boolean }>(({ theme, collapsed }) => ({
   position: 'absolute',
   bottom: theme.spacing(1.5),
   left: '50%',
@@ -107,37 +108,84 @@ const VersionBadge = styled(Box)(({ theme }) => ({
   fontSize: '0.8rem',
   color: alpha(theme.palette.text.secondary, 0.6),
   fontWeight: 400,
+  width: collapsed ? '60px' : 'auto',
+  textAlign: 'center',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  padding: collapsed ? theme.spacing(0.5, 1) : 0,
 }))
 
-const VersionDisplay = () => {
+const VersionDisplay = ({ collapsed }: { collapsed?: boolean }) => {
   const { data: versionInfo, isLoading, error } = useVersionQuery()
 
   if (isLoading) {
-    return (
-      <VersionBadge>
-        Loading version...
+    const content = (
+      <VersionBadge collapsed={collapsed}>
+        {collapsed ? '...' : 'Loading version...'}
       </VersionBadge>
     )
+    
+    if (collapsed) {
+      return (
+        <Tooltip title="Loading version..." placement="right" arrow>
+          {content}
+        </Tooltip>
+      )
+    }
+    return content
   }
 
   if (error) {
-    return (
-      <VersionBadge>
-        Version: Unable to load
+    const content = (
+      <VersionBadge collapsed={collapsed}>
+        {collapsed ? 'v?' : 'Version: Unable to load'}
       </VersionBadge>
     )
+    
+    if (collapsed) {
+      return (
+        <Tooltip title="Version: Unable to load" placement="right" arrow>
+          {content}
+        </Tooltip>
+      )
+    }
+    return content
   }
 
-  return (
-    <VersionBadge>
-      Version: {versionInfo?.version}
-      {versionInfo?.upgradeAvailable && versionInfo?.upgradeVersion && (
+  const content = (
+    <VersionBadge collapsed={collapsed}>
+      {collapsed ? `${versionInfo?.version || '?'}` : `Version: ${versionInfo?.version}`}
+      {!collapsed && versionInfo?.upgradeAvailable && versionInfo?.upgradeVersion && (
         <Box component="span" sx={{ display: 'block', fontSize: '0.7rem', mt: 0.5 }}>
           Update available: {versionInfo.upgradeVersion}
         </Box>
       )}
     </VersionBadge>
   )
+
+  if (collapsed) {
+    return (
+      <Tooltip 
+        title={
+          <Box>
+            Version: {versionInfo?.version}
+            {versionInfo?.upgradeAvailable && versionInfo?.upgradeVersion && (
+              <Box component="span" sx={{ display: 'block', fontSize: '0.85rem', mt: 0.5 }}>
+                Update available: {versionInfo.upgradeVersion}
+              </Box>
+            )}
+          </Box>
+        } 
+        placement="right" 
+        arrow
+      >
+        {content}
+      </Tooltip>
+    )
+  }
+
+  return content
 }
 
 
@@ -152,6 +200,7 @@ const StyledListItemButton = styled(ListItemButton, {
   justifyContent: collapsed ? 'center' : 'initial',
   position: 'relative',
   overflow: 'hidden',
+  cursor: 'pointer',
   transition: theme.transitions.create(['background-color', 'transform'], {
     duration: theme.transitions.duration.shorter,
   }),
@@ -243,15 +292,20 @@ function NavigationItemComponent({ item, isActive, isCollapsed, onClick }: Navig
       {!isCollapsed && (
         <ListItemText
           primary={
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {item.label}
-              {item.badge && (
-                <NavigationBadge
-                  label={item.badge.label}
-                  size="small"
-                  color={item.badge.color}
-                  variant={item.badge.variant}
-                />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                {item.label}
+                {item.badge && (
+                  <NavigationBadge
+                    label={item.badge.label}
+                    size="small"
+                    color={item.badge.color}
+                    variant={item.badge.variant}
+                  />
+                )}
+              </Box>
+              {item.external && (
+                <OpenInNew sx={{ fontSize: '0.875rem', opacity: 0.7 }} />
               )}
             </Box>
           }
@@ -270,7 +324,7 @@ function NavigationItemComponent({ item, isActive, isCollapsed, onClick }: Navig
     return (
       <Tooltip
         title={
-          <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {item.label}
             {item.badge && (
               <NavigationBadge
@@ -278,8 +332,10 @@ function NavigationItemComponent({ item, isActive, isCollapsed, onClick }: Navig
                 size="small"
                 color={item.badge.color}
                 variant={item.badge.variant}
-                sx={{ ml: 1 }}
               />
+            )}
+            {item.external && (
+              <OpenInNew sx={{ fontSize: '0.75rem' }} />
             )}
           </Box>
         }
@@ -336,6 +392,8 @@ export default function Sidenav({
   const handleItemClick = (item: NavigationItem) => {
     if (onItemClick) {
       onItemClick(item)
+    } else if (item.external) {
+      window.open(`https://${window.location.host}${item.path}`, '_blank')
     } else {
       navigate(item.path)
     }
@@ -356,10 +414,8 @@ export default function Sidenav({
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <DrawerHeader>
-        <BrandContainer>
-          <BrandText>
-            {isCollapsed ? 'vJ' : 'vJailbreak'}
-          </BrandText>
+        <BrandContainer collapsed={isCollapsed}>
+          <Platform9Logo collapsed={isCollapsed} />
         </BrandContainer>
       </DrawerHeader>
 
@@ -375,19 +431,21 @@ export default function Sidenav({
         {items
           .filter(item => !item.hidden)
           .map((item) => (
-            <NavigationItemComponent
-              key={item.id}
-              item={item}
-              isActive={currentActiveItem === item.path}
-              isCollapsed={isCollapsed}
-              onClick={handleItemClick}
-            />
+            <Box key={item.id}>
+              {item.id === 'monitoring' && (
+                <Divider sx={{ my: 1, mx: 2 }} />
+              )}
+              <NavigationItemComponent
+                item={item}
+                isActive={currentActiveItem === item.path}
+                isCollapsed={isCollapsed}
+                onClick={handleItemClick}
+              />
+            </Box>
           ))}
       </List>
 
-      {!isCollapsed && (
-        <VersionDisplay />
-      )}
+      <VersionDisplay collapsed={isCollapsed} />
     </Box>
   )
 

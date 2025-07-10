@@ -12,6 +12,8 @@ export interface NavigationItem {
   }
   disabled?: boolean
   hidden?: boolean
+  external?: boolean
+  separator?: boolean
   children?: NavigationItem[]
 }
 

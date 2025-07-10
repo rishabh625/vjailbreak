@@ -11,6 +11,9 @@
     "docker:build": "docker build -t vjailbreak -f ./Dockerfile ."
   },
   "dependencies": {
+    "@bugsnag/browser-performance": "^2.14.0",
+    "@bugsnag/js": "^8.4.0",
+    "@bugsnag/plugin-react": "^8.4.0",
     "@cds/city": "^1.1.0",
     "@cds/core": "^6.15.1",
     "@cds/react": "^6.15.1",

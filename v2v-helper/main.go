@@ -97,7 +97,7 @@ func main() {
 	utils.PrintLog(fmt.Sprintf("VCenter Thumbprint: %s\n", thumbprint))
 
 	// Retrieve the source VM
-	vmops, err := vm.VMOpsBuilder(ctx, *vcclient, migrationparams.SourceVMName)
+	vmops, err := vm.VMOpsBuilder(ctx, *vcclient, migrationparams.SourceVMName, client)
 	if err != nil {
 		handleError(fmt.Sprintf("Failed to get source VM: %v", err))
 	}

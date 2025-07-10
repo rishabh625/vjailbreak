@@ -13,6 +13,7 @@ import {
     Chip
 } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
+import ClusterIcon from '@mui/icons-material/Hub';
 import { useState } from "react";
 import CustomSearchToolbar from "src/components/grid/CustomSearchToolbar";
 import { ClusterMigration } from "src/api/clustermigrations/model";
@@ -128,11 +129,12 @@ const CustomToolbar = ({ numSelected, onDeleteSelected, refetchClusterMigrations
                 alignItems: 'center'
             }}
         >
-            <div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ClusterIcon />
                 <Typography variant="h6" component="h2">
                     Cluster Conversions
                 </Typography>
-            </div>
+            </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
                 {numSelected > 0 && (
                     <Button

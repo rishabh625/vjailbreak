@@ -4,15 +4,14 @@ import { cleanupAllResources } from "src/api/helpers"
 import MenuItem from "@mui/material/MenuItem"
 import Menu from "@mui/material/Menu"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
+import MigrationIcon from "@mui/icons-material/SwapHoriz"
+import ClusterIcon from "@mui/icons-material/Hub"
 import { useState } from "react"
 import ThemeToggle from "./ThemeToggle"
 
 export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const openGrafanaDashboard = () => {
-    window.open(`https://${window.location.host}/grafana`, "_blank")
-  }
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -42,14 +41,6 @@ export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
           </Button>
         )
       }
-      < Button
-        size="large"
-        onClick={openGrafanaDashboard}
-        color="primary"
-        variant="outlined"
-      >
-        Open Grafana
-      </Button>
       <Button
         size="large"
         onClick={handleMenuClick}
@@ -65,10 +56,14 @@ export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={() => handleMigrationSelect('standard')}>
-          Start Migration
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MigrationIcon fontSize="small" />
+            <span>Start Migration</span>
+          </Box>
         </MenuItem>
         <MenuItem onClick={() => handleMigrationSelect('rolling')}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ClusterIcon fontSize="small" />
             <span>Start Cluster Conversion</span>
           </Box>
         </MenuItem>

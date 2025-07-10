@@ -1,4 +1,5 @@
 import { Box, Typography, Drawer, styled, Paper, Tooltip, Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Select, MenuItem, GlobalStyles, FormLabel } from "@mui/material"
+import ClusterIcon from "@mui/icons-material/Hub"
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { DataGrid, GridColDef, GridRowSelectionModel, GridToolbarColumnsButton } from "@mui/x-data-grid"
 import { useNavigate } from "react-router-dom"
@@ -37,6 +38,7 @@ import WindowsIcon from "src/assets/windows_icon.svg";
 import LinuxIcon from "src/assets/linux_icon.svg";
 import WarningIcon from '@mui/icons-material/Warning';
 import { useClusterData } from "./useClusterData"
+import { useErrorHandler } from "src/hooks/useErrorHandler"
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -324,6 +326,7 @@ export default function RollingMigrationFormDrawer({
     onClose,
 }: RollingMigrationFormDrawerProps) {
     const navigate = useNavigate();
+    const { reportError } = useErrorHandler({ component: "RollingMigrationForm" });
     const [sourceCluster, setSourceCluster] = useState("");
     const [destinationPCD, setDestinationPCD] = useState("");
     const [submitting, setSubmitting] = useState(false);
@@ -715,6 +718,14 @@ export default function RollingMigrationFormDrawer({
 
         } catch (error) {
             console.error("Failed to validate or update IP address:", error);
+            reportError(error as Error, {
+                context: 'ip-validation-update',
+                metadata: {
+                    vmId: vmId,
+                    ipAddress: tempIpValue,
+                    action: 'ip-validation-update'
+                }
+            });
             setIpValidationStatus(prev => ({ ...prev, [vmId]: 'invalid' }));
             setIpValidationMessages(prev => ({
                 ...prev,
@@ -743,6 +754,14 @@ export default function RollingMigrationFormDrawer({
 
         } catch (error) {
             console.error("Failed to assign OS family:", error);
+            reportError(error as Error, {
+                context: 'os-family-assignment',
+                metadata: {
+                    vmId: vmId,
+                    osFamily: osFamily,
+                    action: 'os-family-assignment'
+                }
+            });
             // Revert local state on error
             setVmOSAssignments(prev => {
                 const newState = { ...prev };
@@ -978,6 +997,15 @@ export default function RollingMigrationFormDrawer({
                     }
                 } catch (error) {
                     console.error(`Failed to update host config for ${host.name}:`, error);
+                    reportError(error as Error, {
+                        context: 'host-config-update',
+                        metadata: {
+                            hostId: host.id,
+                            hostName: host.name,
+                            hostConfigId: esxHostToPcdMapping[host.id] || host.pcdHostConfigName,
+                            action: 'host-config-update'
+                        }
+                    });
                     // Continue with other hosts even if one fails
                 }
             }
@@ -1050,6 +1078,16 @@ export default function RollingMigrationFormDrawer({
             navigate("/dashboard?tab=clusterconversions");
         } catch (error) {
             console.error("Failed to submit rolling migration plan:", error);
+            reportError(error as Error, {
+                context: 'rolling-migration-plan-submission',
+                metadata: {
+                    sourceCluster: sourceCluster,
+                    destinationPCD: destinationPCD,
+                    selectedVMwareCredName: selectedVMwareCredName,
+                    selectedPcdCredName: selectedPcdCredName,
+                    action: 'rolling-migration-plan-submission'
+                }
+            });
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
             alert(`Failed to submit rolling migration plan: ${errorMessage}`);
         } finally {
@@ -1197,6 +1235,14 @@ export default function RollingMigrationFormDrawer({
             handleClosePcdHostConfigDialog();
         } catch (error) {
             console.error("Error updating PCD host config mapping:", error);
+            reportError(error as Error, {
+                context: 'pcd-host-config-mapping',
+                metadata: {
+                    selectedESXHosts: selectedESXHosts,
+                    selectedPcdHostConfig: selectedPcdHostConfig,
+                    action: 'update-pcd-host-config-mapping'
+                }
+            });
         } finally {
             setUpdatingPcdMapping(false);
         }
@@ -1660,6 +1706,13 @@ export default function RollingMigrationFormDrawer({
 
         } catch (error) {
             console.error("Error in bulk IP validation/assignment:", error);
+            reportError(error as Error, {
+                context: 'bulk-ip-validation-assignment',
+                metadata: {
+                    bulkEditIPs: bulkEditIPs,
+                    action: 'bulk-ip-validation-assignment'
+                }
+            });
         } finally {
             setAssigningIPs(false);
         }
@@ -1717,6 +1770,15 @@ export default function RollingMigrationFormDrawer({
 
         } catch (error) {
             console.error(`Failed to update flavor for VM ${vmId}:`, error);
+            reportError(error as Error, {
+                context: 'individual-vm-flavor-update',
+                metadata: {
+                    vmId: vmId,
+                    flavorValue: flavorValue,
+                    isAutoAssign: flavorValue === "auto-assign",
+                    action: 'individual-vm-flavor-update'
+                }
+            });
             alert(`Failed to assign flavor to VM: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
@@ -1756,6 +1818,16 @@ export default function RollingMigrationFormDrawer({
 
             if (failedUpdates.length > 0) {
                 console.error(`Failed to update flavor for ${failedUpdates.length} VMs`);
+                reportError(new Error(`Failed to update flavor for ${failedUpdates.length} VMs`), {
+                    context: 'vm-flavor-batch-update-failures',
+                    metadata: {
+                        failedUpdates: failedUpdates,
+                        totalVMs: selectedVMs.length,
+                        successCount: results.length - failedUpdates.length,
+                        failedCount: failedUpdates.length,
+                        action: 'vm-flavor-batch-update'
+                    }
+                });
                 alert(`Failed to assign flavor to ${failedUpdates.length} VM${failedUpdates.length > 1 ? 's' : ''}`);
             } else {
                 // Update local state only if all API calls succeeded
@@ -1781,6 +1853,14 @@ export default function RollingMigrationFormDrawer({
             handleCloseFlavorDialog();
         } catch (error) {
             console.error("Error updating flavors:", error);
+            reportError(error as Error, {
+                context: 'vm-flavor-assignment',
+                metadata: {
+                    selectedVMs: selectedVMs,
+                    selectedFlavor: selectedFlavor,
+                    action: 'vm-flavor-assignment'
+                }
+            });
             alert("Failed to assign flavor to VMs");
         } finally {
             setUpdating(false);
@@ -1821,7 +1901,7 @@ export default function RollingMigrationFormDrawer({
                 onClose={handleClose}
                 ModalProps={{ keepMounted: false }}
             >
-                <Header title="Cluster Conversion " />
+                <Header title="Cluster Conversion" icon={<ClusterIcon />} />
 
 
                 <DrawerContent>
