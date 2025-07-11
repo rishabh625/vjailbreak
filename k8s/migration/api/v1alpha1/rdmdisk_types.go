@@ -44,7 +44,7 @@ type RDMDiskStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// RDMDisk is the Schema for the rdmdisks API.
+// RDMDisk is the Schema for the RDMDisks API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 type RDMDisk struct {
@@ -64,11 +64,11 @@ type RDMDiskList struct {
 	Items           []RDMDisk `json:"items"`
 }
 
-// VolumeRefInfo contains information about the OpenStack volume reference.
 type VolumeRefInfo struct {
 	Source            map[string]string `json:"source"`
 	CinderBackendPool string            `json:"cinderBackendPool"`
 	VolumeType        string            `json:"volumeType"`
+	OpenstackCreds    string            `json:"openstackCreds,omitempty"` // Optional: OpenStack credentials to use for the volume
 }
 
 func init() {

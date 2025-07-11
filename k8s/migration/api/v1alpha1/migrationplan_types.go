@@ -97,6 +97,8 @@ type MigrationPlanStatus struct {
 	// Conditions represents the current state of the migration
 	// +optional
 	Conditions []corev1.PodCondition `json:"conditions,omitempty"`
+	// Migration RetryCount is the number of times the migration has been retried
+	RetryCount int `json:"retryCount,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -158,6 +158,9 @@ const (
 
 	// PCDClusterNameNoCluster is the name of the PCD cluster when there is no cluster
 	PCDClusterNameNoCluster = "NO CLUSTER"
+
+	// RDMDiskControllerName is the name of the RDM disk controller
+	RDMDiskControllerName = "rdmdisk-controller"
 )
 
 // CloudInitScript contains the cloud-init script for VM initialization
