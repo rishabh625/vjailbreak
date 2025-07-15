@@ -1,4 +1,4 @@
-package utils
+package migrateutils
 
 import (
 	"log"

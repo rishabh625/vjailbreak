@@ -1549,7 +1549,7 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 					}
 					mp := make(map[string]string)
 					mp[splotVolRef[0]] = splotVolRef[1]
-					fmt.Println("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
+					log.Info("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
 					rdmInfo.OpenstackVolumeRef = vjailbreakv1alpha1.OpenStackVolumeRefInfo{
 						VolumeRef: mp,
 					}

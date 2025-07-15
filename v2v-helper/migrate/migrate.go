@@ -21,6 +21,7 @@ import (
 	"github.com/platform9/vjailbreak/v2v-helper/openstack"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	"github.com/platform9/vjailbreak/v2v-helper/virtv2v"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
@@ -96,13 +97,16 @@ func (migobj *Migrate) CreateVolumes(vminfo vm.VMInfo) (vm.VMInfo, error) {
 func (migobj *Migrate) AttachVolume(disk vm.VMDisk) (string, error) {
 	openstackops := migobj.Openstackclients
 	migobj.logMessage("Attaching volumes to VM")
-
-	if err := openstackops.AttachVolumeToVM(disk.OpenstackVol.ID); err != nil {
+	volumeID, err := getVolumeID(disk)
+	if err != nil {
+		return "", fmt.Errorf("failed to get volume ID: %s", err)
+	}
+	if err := openstackops.AttachVolumeToVM(volumeID); err != nil {
 		return "", errors.Wrap(err, "failed to attach volume to VM")
 	}
 
 	// Get the Path of the attached volume
-	devicePath, err := openstackops.FindDevice(disk.OpenstackVol.ID)
+	devicePath, err := openstackops.FindDevice(volumeID)
 	if err != nil {
 		return "", fmt.Errorf("failed to find device: %s", err)
 	}
@@ -419,7 +423,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	}
 
 	// create XML for conversion
-	err = utils.GenerateXMLConfig(vminfo)
+	err = migrateutils.GenerateXMLConfig(vminfo)
 	if err != nil {
 		return fmt.Errorf("failed to generate XML: %s", err)
 	}
@@ -928,7 +932,15 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 		}
 		return errors.Wrap(err, "failed to live replicate disks")
 	}
-
+	// Import LUN and MigrateRDM disk
+	for idx, rdmDisk := range vminfo.RDMDisks {
+		volumeID, err := migobj.cinderManage(rdmDisk)
+		if err != nil {
+			migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
+			return errors.Wrap(err, "failed to import LUN")
+		}
+		vminfo.RDMDisks[idx].VolumeId = volumeID
+	}
 	// Convert the Boot Disk to raw format
 	err = migobj.ConvertVolumes(ctx, vminfo)
 	if err != nil {
@@ -967,4 +979,43 @@ func (migobj *Migrate) cleanup(vminfo vm.VMInfo, message string) error {
 		return errors.Wrap(err, fmt.Sprintf("Failed to delete snapshot of source VM: %s\n", err))
 	}
 	return nil
+}
+
+// getVolumeID retrieves the volume ID from the disk object, by type asserting passed object.
+func getVolumeID(d interface{}) (string, error) {
+	if d == nil {
+		return "", fmt.Errorf("disk is nil")
+	}
+
+	switch disk := d.(type) {
+	case vm.VMDisk:
+		if disk.OpenstackVol == nil {
+			return "", fmt.Errorf("OpenStack volume is nil")
+		}
+		return disk.OpenstackVol.ID, nil
+	case string:
+		return disk, nil
+	default:
+		return "", fmt.Errorf("unsupported type: %T", d)
+	}
+}
+
+// cinderManage imports a LUN into OpenStack Cinder and returns the volume ID.
+func (migobj *Migrate) cinderManage(rdmDisk vm.RDMDisk) (string, error) {
+	openstackops := migobj.Openstackclients
+	migobj.logMessage(fmt.Sprintf("Importing LUN: %s", rdmDisk.DiskName))
+	volume, err := openstackops.CinderManage(rdmDisk)
+	if err != nil || volume == nil {
+		return "", fmt.Errorf("failed to import LUN: %s", err)
+	} else if volume.ID == "" {
+		return "", fmt.Errorf("failed to import LUN: received empty volume ID")
+	}
+	migobj.logMessage(fmt.Sprintf("LUN imported successfully, waiting for volume %s to become available", volume.ID))
+	// Wait for the volume to become available
+	err = openstackops.WaitForVolume(volume.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to wait for volume to become available: %s", err)
+	}
+	migobj.logMessage(fmt.Sprintf("Volume %s is now available", volume.ID))
+	return volume.ID, nil
 }
