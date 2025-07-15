@@ -6,18 +6,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	reflect "reflect"
 	"strings"
 	"time"
 
-	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/vmware/govmomi/object"
@@ -263,12 +258,6 @@ func (vmops *VMOps) UpdateDisksInfo(vminfo *VMInfo) error {
 			vminfo.VMDisks[idx].Snapname = snapname[idx]
 			vminfo.VMDisks[idx].ChangeID = snapid[idx]
 		}
-		// Based on VMName and diskname fetch DiskInfo
-		rdmDIskInfo, err := GetVMwareMachine(vmops.ctx, vmops.k8sClient, vminfo.Name)
-		if err != nil {
-			return fmt.Errorf("failed to get rdmDisk properties: %s", err)
-		}
-		copyRDMDisks(vminfo, rdmDIskInfo)
 	}
 
 	return nil
@@ -544,65 +533,6 @@ func (vmops *VMOps) VMPowerOn() error {
 	return nil
 }
 
-// GetVMwareMachine retrieves a VMwareMachine object from the Kubernetes cluster based on the VM name.
-func GetVMwareMachine(ctx context.Context, client k8sclient.Client, vmName string) (*vjailbreakv1alpha1.VMwareMachine, error) {
-	if client == nil || ctx == nil || vmName == "" {
-		return nil, fmt.Errorf("invalid parameters: client, context, and vmName must not be nil or empty")
-	}
-	// Convert VM name to k8s compatible name
-	sanitizedVMName, err := utils.ConvertToK8sName(vmName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert VM name to k8s name: %w", err)
-	}
-
-	// Create namespaced name for lookup
-	namespacedName := k8stypes.NamespacedName{
-		Name:      sanitizedVMName,                    // Use the sanitized VM name
-		Namespace: constants.MigrationSystemNamespace, // Specify the namespace
-	}
-
-	// Create VMwareMachine object
-	vmwareMachine := &vjailbreakv1alpha1.VMwareMachine{}
-	// Get VMwareMachine object
-	if err := client.Get(ctx, namespacedName, vmwareMachine); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil, fmt.Errorf("VMwareMachine '%s' not found in namespace '%s'", sanitizedVMName, namespacedName.Namespace)
-		}
-		return nil, fmt.Errorf("failed to get VMwareMachine: %w", err)
-	}
-
-	return vmwareMachine, nil
-}
-
-func copyRDMDisks(vminfo *VMInfo, rdmDiskInfo *vjailbreakv1alpha1.VMwareMachine) {
-	// Check if vminfo is nil
-	if vminfo == nil || rdmDiskInfo == nil {
-		fmt.Printf("vminfo or rdm disk info is is nil")
-		return
-	}
-	if reflect.DeepEqual(rdmDiskInfo.Spec, vjailbreakv1alpha1.VMwareMachineSpec{}) {
-		fmt.Printf("rdm disk info spec is nil")
-		return
-	}
-	if reflect.DeepEqual(rdmDiskInfo.Spec.VMInfo, vjailbreakv1alpha1.VMInfo{}) {
-		fmt.Printf("rdm disk info spec is nil")
-		return
-	}
-	if rdmDiskInfo.Spec.VMInfo.RDMDisks != nil {
-		vminfo.RDMDisks = make([]RDMDisk, len(rdmDiskInfo.Spec.VMInfo.RDMDisks))
-		for i, disk := range rdmDiskInfo.Spec.VMInfo.RDMDisks {
-			vminfo.RDMDisks[i] = RDMDisk{
-				DiskName:          disk.DiskName,
-				DiskSize:          disk.DiskSize,
-				UUID:              disk.UUID,
-				DisplayName:       disk.DisplayName,
-				CinderBackendPool: disk.OpenstackVolumeRef.CinderBackendPool,
-				VolumeType:        disk.OpenstackVolumeRef.VolumeType,
-				VolumeRef:         disk.OpenstackVolumeRef.VolumeRef,
-			}
-		}
-	}
-}
 func (vmops *VMOps) ListSnapshots() ([]types.VirtualMachineSnapshotTree, error) {
 	vm := vmops.VMObj
 	var o mo.VirtualMachine

@@ -1,4 +1,4 @@
-package migrateutils
+package utils
 
 import (
 	"encoding/json"
@@ -13,7 +13,6 @@ import (
 
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 
 	"github.com/gophercloud/gophercloud"
@@ -183,7 +182,7 @@ func (osclient *OpenStackClients) AttachVolumeToVM(volumeID string) error {
 		return fmt.Errorf("failed to attach volume to VM: %s", err)
 	}
 
-	utils.PrintLog("Waiting for volume attachment")
+	PrintLog("Waiting for volume attachment")
 	err = osclient.WaitForVolumeAttachment(volumeID)
 	if err != nil {
 		return fmt.Errorf("failed to wait for volume attachment: %s", err)
@@ -307,7 +306,7 @@ func (osclient *OpenStackClients) GetClosestFlavour(cpu int32, memory int32) (*f
 		return nil, fmt.Errorf("failed to extract all flavors: %s", err)
 	}
 
-	utils.PrintLog(fmt.Sprintf("Current requirements: %d CPUs and %d MB of RAM", cpu, memory))
+	PrintLog(fmt.Sprintf("Current requirements: %d CPUs and %d MB of RAM", cpu, memory))
 
 	bestFlavor := new(flavors.Flavor)
 	bestFlavor.VCPUs = constants.MaxCPU
@@ -322,10 +321,10 @@ func (osclient *OpenStackClients) GetClosestFlavour(cpu int32, memory int32) (*f
 	}
 
 	if bestFlavor.VCPUs != constants.MaxCPU {
-		utils.PrintLog(fmt.Sprintf("The best flavor is:\nName: %s, ID: %s, RAM: %dMB, VCPUs: %d, Disk: %dGB\n",
+		PrintLog(fmt.Sprintf("The best flavor is:\nName: %s, ID: %s, RAM: %dMB, VCPUs: %d, Disk: %dGB\n",
 			bestFlavor.Name, bestFlavor.ID, bestFlavor.RAM, bestFlavor.VCPUs, bestFlavor.Disk))
 	} else {
-		utils.PrintLog("No suitable flavor found.")
+		PrintLog("No suitable flavor found.")
 		return nil, fmt.Errorf("no suitable flavor found for %d vCPUs and %d MB RAM", cpu, memory)
 	}
 
@@ -383,11 +382,11 @@ func (osclient *OpenStackClients) CreatePort(network *networks.Network, mac, ip,
 
 	for _, port := range portList {
 		if port.MACAddress == mac {
-			utils.PrintLog(fmt.Sprintf("Port with MAC address %s already exists, ID: %s", mac, port.ID))
+			PrintLog(fmt.Sprintf("Port with MAC address %s already exists, ID: %s", mac, port.ID))
 			return &port, nil
 		}
 	}
-	utils.PrintLog(fmt.Sprintf("Port with MAC address %s does not exist, creating new port, trying with same IP address: %s", mac, ip))
+	PrintLog(fmt.Sprintf("Port with MAC address %s does not exist, creating new port, trying with same IP address: %s", mac, ip))
 
 	// Check if subnet is valid to avoid panic.
 	if len(network.Subnets) == 0 {
@@ -406,7 +405,7 @@ func (osclient *OpenStackClients) CreatePort(network *networks.Network, mac, ip,
 	}).Extract()
 	if err != nil {
 		// return nil, err
-		utils.PrintLog(fmt.Sprintf("Could Not Use IP: %s, using DHCP to create Port", ip))
+		PrintLog(fmt.Sprintf("Could Not Use IP: %s, using DHCP to create Port", ip))
 		port, err = ports.Create(osclient.NetworkingClient, ports.CreateOpts{
 			Name:       "port-" + vmname,
 			NetworkID:  network.ID,
@@ -416,7 +415,7 @@ func (osclient *OpenStackClients) CreatePort(network *networks.Network, mac, ip,
 			return nil, err
 		}
 	}
-	utils.PrintLog(fmt.Sprintf("Port created with ID: %s", port.ID))
+	PrintLog(fmt.Sprintf("Port created with ID: %s", port.ID))
 	return port, nil
 }
 
@@ -470,12 +469,6 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 			return nil, fmt.Errorf("failed to wait for volume to become available: %s", err)
 		}
 	}
-	for _, disk := range vminfo.RDMDisks {
-		err := osclient.WaitForVolume(disk.VolumeId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to wait for volume to become available: %s", err)
-		}
-	}
 	server, err := servers.Create(osclient.ComputeClient, createOpts).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %s", err)
@@ -486,7 +479,7 @@ func (osclient *OpenStackClients) CreateVM(flavor *flavors.Flavor, networkIDs, p
 		return nil, fmt.Errorf("failed to wait for server to become active: %s", err)
 	}
 
-	utils.PrintLog(fmt.Sprintf("Server created with ID: %s, Attaching Additional Disks", server.ID))
+	PrintLog(fmt.Sprintf("Server created with ID: %s, Attaching Additional Disks", server.ID))
 
 	for _, disk := range append(vminfo.VMDisks[:bootableDiskIndex], vminfo.VMDisks[bootableDiskIndex+1:]...) {
 		_, err := volumeattach.Create(osclient.ComputeClient, server.ID, volumeattach.CreateOpts{
@@ -518,4 +511,42 @@ func (osclient *OpenStackClients) WaitUntilVMActive(vmID string) (bool, error) {
 		return false, fmt.Errorf("server is not active")
 	}
 	return true, nil
+}
+
+// CinderManage Manage triggers the volume manage request and returns volume.
+func (osclient *OpenStackClients) CinderManage(rdmDisk vm.RDMDisk, openstackAPIVersion string) (*volumes.Volume, error) {
+
+	body, err := RDMDiskToVolumeManageMap(rdmDisk)
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+
+	response, err := osclient.BlockStorageClient.Post(osclient.BlockStorageClient.ServiceURL("manageable_volumes"), body, &result, &gophercloud.RequestOpts{
+		OkCodes:     []int{http.StatusAccepted},
+		MoreHeaders: map[string]string{"OpenStack-API-Version": openstackAPIVersion},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if response != nil && response.Body != nil {
+		defer response.Body.Close()
+	}
+
+	volumeMap := result["volume"].(map[string]interface{})
+
+	// Convert volume map to JSON
+	volumeJSON, err := json.Marshal(volumeMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal JSON into your struct
+	var v volumes.Volume
+	if err := json.Unmarshal(volumeJSON, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }

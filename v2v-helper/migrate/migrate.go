@@ -20,7 +20,6 @@ import (
 	"github.com/platform9/vjailbreak/v2v-helper/openstack"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 	"github.com/platform9/vjailbreak/v2v-helper/virtv2v"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
@@ -422,7 +421,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	}
 
 	// create XML for conversion
-	err = migrateutils.GenerateXMLConfig(vminfo)
+	err = utils.GenerateXMLConfig(vminfo)
 	if err != nil {
 		return fmt.Errorf("failed to generate XML: %s", err)
 	}
@@ -851,15 +850,6 @@ func (migobj *Migrate) MigrateVM(ctx context.Context) error {
 			return errors.Wrapf(err, "failed to live replicate disks: %s", cleanuperror)
 		}
 		return errors.Wrap(err, "failed to live replicate disks")
-	}
-	// Import LUN and MigrateRDM disk
-	for idx, rdmDisk := range vminfo.RDMDisks {
-		volumeID, err := migobj.CinderManage(rdmDisk)
-		if err != nil {
-			migobj.cleanup(vminfo, fmt.Sprintf("failed to import LUN: %s", err))
-			return errors.Wrap(err, "failed to import LUN")
-		}
-		vminfo.RDMDisks[idx].VolumeId = volumeID
 	}
 	// Convert the Boot Disk to raw format
 	err = migobj.ConvertVolumes(ctx, vminfo)

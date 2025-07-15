@@ -115,9 +115,13 @@ func (r *VMwareCredsReconciler) reconcileNormal(ctx context.Context, scope *scop
 		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error creating VMs for VMwareCreds '%s'", scope.Name()))
 	}
 
-	vminfo, err := utils.GetAllVMs(ctx, r.Client, scope.VMwareCreds, scope.VMwareCreds.Spec.DataCenter)
+	vminfo, rdmDiskInfo, err := utils.GetAllVMs(ctx, r.Client, scope.VMwareCreds, scope.VMwareCreds.Spec.DataCenter)
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error getting info of all VMs for VMwareCreds '%s'", scope.Name()))
+	}
+	err = utils.CreateOrUpdateRDMDisks(ctx, r.Client, scope.VMwareCreds, rdmDiskInfo)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, fmt.Sprintf("Error creating RDM disk CR for VMwareCreds '%s'", scope.Name()))
 	}
 	err = utils.CreateOrUpdateVMwareMachines(ctx, r.Client, scope.VMwareCreds, vminfo)
 	if err != nil {

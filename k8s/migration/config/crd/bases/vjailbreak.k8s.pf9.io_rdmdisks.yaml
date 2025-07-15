@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RDMDisk is the Schema for the rdmdisks API.
+        description: RDMDisk is the Schema for the RDMDisks API.
         properties:
           apiVersion:
             description: |-
@@ -53,6 +53,8 @@ spec:
               openstackVolumeRef:
                 properties:
                   cinderBackendPool:
+                    type: string
+                  openstackCreds:
                     type: string
                   source:
                     additionalProperties:
