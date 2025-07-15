@@ -5,4 +5,8 @@ kind: Kustomization
 images:
 - name: vpwned
   newName: quay.io/platform9/vjailbreak-vpwned
+<<<<<<< HEAD
   newTag: -1bb27fa
+=======
+  newTag: main-a39d6c0
+>>>>>>> 37f1817 (ran make build installer)
