@@ -3419,7 +3419,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/platform9/vjailbreak-controller:-1bb27fa
+        image: quay.io/platform9/vjailbreak-controller:main-9bb1691
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
@@ -3497,7 +3497,7 @@ spec:
         app: vpwned-sdk
     spec:
       containers:
-      - image: quay.io/platform9/vjailbreak-vpwned:-1bb27fa
+      - image: quay.io/platform9/vjailbreak-vpwned:main-9bb1691
         imagePullPolicy: IfNotPresent
         name: vpwned
         ports:
