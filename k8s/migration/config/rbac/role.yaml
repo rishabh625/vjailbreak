@@ -68,6 +68,7 @@ rules:
   - openstackcreds
   - pcdclusters
   - pcdhosts
+  - rdmdisks
   - rollingmigrationplans
   - storagemappings
   - vjailbreaknodes
@@ -95,6 +96,7 @@ rules:
   - openstackcreds/finalizers
   - pcdclusters/finalizers
   - pcdhosts/finalizers
+  - rdmdisks/finalizers
   - rollingmigrationplans/finalizers
   - storagemappings/finalizers
   - vjailbreaknodes/finalizers
@@ -114,6 +116,7 @@ rules:
   - openstackcreds/status
   - pcdclusters/status
   - pcdhosts/status
+  - rdmdisks/status
   - rollingmigrationplans/status
   - storagemappings/status
   - vjailbreaknodes/status
