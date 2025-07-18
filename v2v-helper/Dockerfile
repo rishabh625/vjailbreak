@@ -41,8 +41,7 @@ RUN curl -L -o virt-v2v-2.7.13-1.fc42.x86_64.rpm https://github.com/platform9/vj
 RUN dnf install -y \
     nbdkit \
     nbdkit-vddk-plugin \
-    libnbd \
-    virtio-win 
+    libnbd 
     
 RUN dnf install -y /tmp/virt-v2v-2.7.13-1.fc42.x86_64.rpm && \
     dnf clean all && \

@@ -34,7 +34,7 @@ const ToggleButtonCollapsed = styled(IconButton)(({ theme }) => ({
   borderRadius: '50%',
   width: 32,
   height: 32,
-  zIndex: theme.zIndex.drawer + 2,
+  zIndex: theme.zIndex.drawer + 1,
   boxShadow: theme.shadows[2],
   transition: theme.transitions.create(['left', 'box-shadow'], {
     easing: theme.transitions.easing.sharp,
@@ -250,7 +250,7 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
   borderRadius: '50%',
   width: 32,
   height: 32,
-  zIndex: theme.zIndex.drawer + 2,
+  zIndex: theme.zIndex.drawer + 1,
   boxShadow: theme.shadows[2],
   transition: theme.transitions.create(['left', 'box-shadow'], {
     easing: theme.transitions.easing.sharp,

@@ -35,7 +35,8 @@ spec:
         - name: hosts-file
           mountPath: /etc/hosts
           readOnly: true
-      dnsPolicy: ClusterFirst
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}

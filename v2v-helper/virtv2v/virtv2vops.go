@@ -32,6 +32,8 @@ type VirtV2VOperations interface {
 	AddWildcardNetplan(path string) error
 	GetOsRelease(path string) (string, error)
 	AddFirstBootScript(firstbootscript, firstbootscriptname string) error
+	AddUdevRules(disks []vm.VMDisk, useSingleDisk bool, diskPath string, interfaces []string, macs []string) error
+	GetNetworkInterfaceNames(path string) ([]string, error)
 }
 
 func RetainAlphanumeric(input string) string {
@@ -374,4 +376,59 @@ func GetBootableVolumeIndex(disks []vm.VMDisk) (int, error) {
 		}
 	}
 	return -1, errors.New("bootable volume not found")
+}
+
+func AddUdevRules(disks []vm.VMDisk, useSingleDisk bool, diskPath string, interfaces []string, macs []string) error {
+
+	if len(interfaces) != len(macs) {
+		return fmt.Errorf("mismatch between number of interfaces and MACs")
+	}
+	var ans string
+
+	// Create the udev rules content
+	var udevRules strings.Builder
+	for i, iface := range interfaces {
+		udevRules.WriteString(fmt.Sprintf("SUBSYSTEM==\"net\", ACTION==\"add\", ATTR{address}==\"%s\", NAME=\"%s\"\n", macs[i], iface))
+		log.Printf("Adding udev rule: %s", udevRules.String())
+	}
+
+	err := os.WriteFile("/home/fedora/70-persistent-net.rules", []byte(udevRules.String()), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create udev rules file: %s", err)
+	}
+	log.Println("Uploading udev rules file to disk")
+	// Upload it to the disk
+	os.Setenv("LIBGUESTFS_BACKEND", "direct")
+	if useSingleDisk {
+		command := `upload /home/fedora/70-persistent-net.rules /etc/udev/rules.d/70-persistent-net.rules`
+		ans, err = RunCommandInGuest(diskPath, command, true)
+	} else {
+		command := "upload"
+		ans, err = RunCommandInGuestAllVolumes(disks, command, true, "/home/fedora/70-persistent-net.rules", "/etc/udev/rules.d/70-persistent-net.rules")
+	}
+	if err != nil {
+		fmt.Printf("failed to run command (%s): %v: %s\n", "upload", err, strings.TrimSpace(ans))
+		return err
+	}
+	return nil
+}
+
+func GetNetworkInterfaceNames(path string) ([]string, error) {
+	// Get the network interface names
+	command := "cat /etc/network/interfaces"
+	ans, err := RunCommandInGuest(path, command, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command (%s): %v: %s", command, err, strings.TrimSpace(ans))
+	}
+
+	// Parse the output
+	lines := strings.Split(ans, "\n")
+	var interfaces []string
+	for _, line := range lines {
+		if strings.HasPrefix(line, "iface") && !strings.Contains(line, "lo") {
+			interfaces = append(interfaces, strings.Fields(line)[1])
+		}
+	}
+	return interfaces, nil
+
 }

@@ -530,51 +530,6 @@ spec:
               MigrationPlanStatus defines the observed state of MigrationPlan including
               the current status and progress of the migration
             properties:
-              conditions:
-                description: Conditions represents the current state of the migration
-                items:
-                  description: PodCondition contains details for the current condition
-                    of this pod.
-                  properties:
-                    lastProbeTime:
-                      description: Last time we probed the condition.
-                      format: date-time
-                      type: string
-                    lastTransitionTime:
-                      description: Last time the condition transitioned from one status
-                        to another.
-                      format: date-time
-                      type: string
-                    message:
-                      description: Human-readable message indicating details about
-                        last transition.
-                      type: string
-                    observedGeneration:
-                      description: |-
-                        If set, this represents the .metadata.generation that the pod condition was set based upon.
-                        This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
-                      format: int64
-                      type: integer
-                    reason:
-                      description: Unique, one-word, CamelCase reason for the condition's
-                        last transition.
-                      type: string
-                    status:
-                      description: |-
-                        Status is the status of the condition.
-                        Can be True, False, Unknown.
-                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
-                      type: string
-                    type:
-                      description: |-
-                        Type is the type of the condition.
-                        More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
-                      type: string
-                  required:
-                  - status
-                  - type
-                  type: object
-                type: array
               migrationMessage:
                 description: MigrationMessage is the message associated with the migration
                 type: string
@@ -2349,21 +2304,54 @@ spec:
                   esxiName:
                     description: ESXiName is the name of the ESXi host
                     type: string
+                  guestNetworks:
+                    description: GuestNetworks is the list of network interfaces for
+                      the virtual machine as reported by the guest
+                    items:
+                      description: GuestNetwork represents a network interface as
+                        reported by the guest.
+                      properties:
+                        device:
+                          type: string
+                        dns:
+                          items:
+                            type: string
+                          type: array
+                        ip:
+                          type: string
+                        mac:
+                          type: string
+                        origin:
+                          type: string
+                        prefixLength:
+                          format: int32
+                          type: integer
+                      type: object
+                    type: array
                   ipAddress:
                     description: IPAddress is the IP address of the virtual machine
                     type: string
-                  macAddresses:
-                    description: MacAddresses is the list of MAC addresses assigned
-                      to the VM's network interfaces
-                    items:
-                      type: string
-                    type: array
                   memory:
                     description: Memory is the amount of memory in the virtual machine
                     type: integer
                   name:
                     description: Name is the name of the virtual machine
                     type: string
+                  networkInterfaces:
+                    description: NetworkInterfaces is the list of network interfaces
+                      for the virtual machine expect the lo device
+                    items:
+                      description: NIC represents a Virtual ethernet card in the virtual
+                        machine.
+                      properties:
+                        mac:
+                          type: string
+                        network:
+                          type: string
+                        order:
+                          type: integer
+                      type: object
+                    type: array
                   networks:
                     description: Networks is the list of networks for the virtual
                       machine
@@ -3585,7 +3573,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/platform9/vjailbreak-controller:feature/rdm-disk-cr-intro-3bb9ed7
+        image: quay.io/platform9/vjailbreak-controller:v0.2.2
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
@@ -3618,6 +3606,8 @@ spec:
           name: vddk
         - mountPath: /etc/hosts
           name: hosts-file
+          readOnly: true
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       securityContext:
         runAsGroup: 0
@@ -3663,7 +3653,7 @@ spec:
         app: vpwned-sdk
     spec:
       containers:
-      - image: quay.io/platform9/vjailbreak-vpwned:feature/rdm-disk-cr-intro-3bb9ed7
+      - image: quay.io/platform9/vjailbreak-vpwned:v0.2.2
         imagePullPolicy: IfNotPresent
         name: vpwned
         ports:
@@ -3676,7 +3666,8 @@ spec:
         - mountPath: /etc/hosts
           name: hosts-file
           readOnly: true
-      dnsPolicy: ClusterFirst
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}

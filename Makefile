@@ -17,6 +17,7 @@ endif
 
 VERSION = $(RELEASE_VER)-$(GIT_SHA)
 
+export REGISTRY ?= quay.io
 export REPO ?= platform9
 export TAG ?= $(VERSION)
 export UI_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-ui:${TAG}
@@ -26,19 +27,16 @@ export VPWNED_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-vpwned:${TAG}
 export RELEASE_VERSION ?= $(VERSION)
 export KUBECONFIG ?= ~/.kube/config
 export CONTAINER_TOOL ?= docker
-export REGISTRY ?= quay.io
 
 
 .PHONY: ui
 ui:
 	docker build --platform linux/amd64 -t $(UI_IMG) ui/
-	docker push $(UI_IMG)
 
 .PHONY: v2v-helper
 v2v-helper:
 	make -C v2v-helper build
 	docker build --platform linux/amd64 --build-arg RELEASE_VERSION=$(VERSION) -t $(V2V_IMG) v2v-helper/
-	docker push $(V2V_IMG)
 
 .PHONY: test-v2v-helper
 test-v2v-helper:
@@ -46,11 +44,11 @@ test-v2v-helper:
 
 .PHONY: vjail-controller
 vjail-controller: v2v-helper
-	make -C k8s/migration/ docker-build docker-push
+	make -C k8s/migration/ docker-build
 
 .PHONY: vjail-controller-only
 vjail-controller-only:
-	make -C k8s/migration/ docker-build docker-push
+	make -C k8s/migration/ docker-build
 
 .PHONY: generate-manifests
 generate-manifests: vjail-controller ui
@@ -61,7 +59,7 @@ generate-manifests: vjail-controller ui
 	
 .PHONY: build-vpwned
 build-vpwned:
-	make -C pkg/vpwned docker-build docker-push
+	make -C pkg/vpwned docker-build
 
 build-installer:
 	make -C k8s/migration/ build-installer 

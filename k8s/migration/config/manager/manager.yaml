@@ -54,6 +54,7 @@ spec:
         # seccompProfile:
         #   type: RuntimeDefault
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
       - command:
         - /manager
@@ -91,6 +92,7 @@ spec:
           name: vddk
         - mountPath: /etc/hosts
           name: hosts-file
+          readOnly: true
       serviceAccountName: controller-manager
       volumes:
       - name: master-token

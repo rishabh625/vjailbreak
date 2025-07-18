@@ -9,19 +9,20 @@ import (
 	"strings"
 	"time"
 
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
+	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/k8sutils"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//go:generate mockgen -source=../vm/vmops.go -destination=../vm/vmops_mock.go -package=vm
+//go:generate mockgen -source=vmops.go -destination=vmops_mock.go -package=vm
 
 type VMOperations interface {
 	GetVMInfo(ostype string) (VMInfo, error)
@@ -44,18 +45,35 @@ type VMOperations interface {
 }
 
 type VMInfo struct {
-	CPU      int32
-	Memory   int32
-	State    types.VirtualMachinePowerState
-	Mac      []string
-	IPs      []string
-	UUID     string
-	Host     string
-	VMDisks  []VMDisk
-	UEFI     bool
-	Name     string
-	OSType   string
-	RDMDisks []RDMDisk
+	CPU               int32
+	Memory            int32
+	State             types.VirtualMachinePowerState
+	Mac               []string
+	IPs               []string
+	UUID              string
+	Host              string
+	VMDisks           []VMDisk
+	UEFI              bool
+	Name              string
+	OSType            string
+	GuestNetworks     []vjailbreakv1alpha1.GuestNetwork
+	NetworkInterfaces []vjailbreakv1alpha1.NIC
+	RDMDisks          []RDMDisk
+}
+
+type NIC struct {
+	Network string
+	MAC     string
+	Index   int
+}
+
+type GuestNetwork struct {
+	MAC          string
+	IP           string
+	Origin       string
+	PrefixLength int32
+	DNS          []string
+	Device       string
 }
 
 type ChangeID struct {
@@ -133,13 +151,26 @@ func (vmops *VMOps) GetVMInfo(ostype string) (VMInfo, error) {
 			mac = append(mac, nic.GetVirtualEthernetCard().MacAddress)
 		}
 	}
-	// Get IP addresses of the VM
+	// Get IP addresses of the VM from vmwaremachines
 	ips := []string{}
-	for _, nic := range o.Guest.Net {
-		if nic.IpConfig != nil {
-			for _, ip := range nic.IpConfig.IpAddress {
-				if !strings.Contains(ip.IpAddress, ":") {
-					ips = append(ips, ip.IpAddress)
+	// Get the vmware machine from k8s
+	vmk8sName, err := k8sutils.ConvertToK8sName(o.Name)
+	if err != nil {
+		return VMInfo{}, fmt.Errorf("failed to convert vm name to k8s name: %s", err)
+	}
+
+	vmwareMachine, err := k8sutils.GetVMwareMachine(vmops.ctx, vmk8sName)
+	if err != nil {
+		return VMInfo{}, fmt.Errorf("failed to get vmware machine: %s", err)
+	}
+
+	for _, macAddresss := range mac {
+		// Get the IPs from the vmware machine.
+		if vmwareMachine.Spec.VMInfo.GuestNetworks != nil {
+			for _, guestNetwork := range vmwareMachine.Spec.VMInfo.GuestNetworks {
+				// Every mac should have a corresponding IP, Ignore link layer ip
+				if guestNetwork.MAC == macAddresss && !strings.Contains(guestNetwork.IP, ":") {
+					ips = append(ips, guestNetwork.IP)
 				}
 			}
 		}
@@ -170,17 +201,19 @@ func (vmops *VMOps) GetVMInfo(ostype string) (VMInfo, error) {
 	}
 
 	vminfo := VMInfo{
-		CPU:     o.Config.Hardware.NumCPU,
-		Memory:  o.Config.Hardware.MemoryMB,
-		State:   o.Runtime.PowerState,
-		Mac:     mac,
-		IPs:     ips,
-		UUID:    o.Config.Uuid,
-		Host:    o.Runtime.Host.Reference().Value,
-		Name:    o.Name,
-		VMDisks: vmdisks,
-		UEFI:    uefi,
-		OSType:  ostype,
+		CPU:               o.Config.Hardware.NumCPU,
+		Memory:            o.Config.Hardware.MemoryMB,
+		State:             o.Runtime.PowerState,
+		Mac:               mac,
+		IPs:               ips,
+		UUID:              o.Config.Uuid,
+		Host:              o.Runtime.Host.Reference().Value,
+		Name:              o.Name,
+		VMDisks:           vmdisks,
+		UEFI:              uefi,
+		OSType:            ostype,
+		NetworkInterfaces: vmwareMachine.Spec.VMInfo.NetworkInterfaces,
+		GuestNetworks:     vmwareMachine.Spec.VMInfo.GuestNetworks,
 	}
 	return vminfo, nil
 }

@@ -13,6 +13,26 @@ data:
                 },
                 "orgId": 1,
                 "type": "file"
+            },
+            {
+                "folder": "K8s Dashboards",
+                "folderUid": "k8s-dashboards",
+                "name": "k8s-dashboards",
+                "options": {
+                    "path": "/grafana-dashboard-definitions/k8s-dashboards"
+                },
+                "orgId": 1,
+                "type": "file"
+            },
+            {
+                "folder": "Migration Dashboards",
+                "folderUid": "migration-dashboards",
+                "name": "migration-dashboards",
+                "options": {
+                    "path": "/grafana-dashboard-definitions/migration-dashboards"
+                },
+                "orgId": 1,
+                "type": "file"
             }
         ]
     }

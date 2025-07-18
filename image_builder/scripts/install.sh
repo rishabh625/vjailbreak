@@ -64,6 +64,31 @@ wait_for_k3s() {
   done
 }
 
+wait_for_k3s_worker() {
+  local timeout=300
+  local start_time=$(date +%s)
+
+  while true; do
+    if ctr version >/dev/null 2>&1; then
+      log "K3s worker node is ready (containerd is responsive)."
+      return 0
+    fi
+
+    local current_time
+    current_time=$(date +%s)
+    local elapsed_time=$((current_time - start_time))
+
+    if [ "$elapsed_time" -ge "$timeout" ]; then
+      log "ERROR: Timed out waiting for K3s worker to be ready."
+      exit 1
+    fi
+
+    log "Waiting for K3s worker node (ctr)..."
+    sleep 5
+  done
+}
+
+
 if [ "$IS_MASTER" == "true" ]; then
   log "Setting up K3s Master..."
 
@@ -130,7 +155,8 @@ else
     log "ERROR: Missing MASTER_IP or K3S_TOKEN for worker. Exiting."
     exit 1
   fi
-
+  
+  
   # Echo K3S_URL and K3S_TOKEN for debugging
   export K3S_URL="https://$MASTER_IP:6443"
   export K3S_TOKEN="$K3S_TOKEN"
@@ -141,6 +167,17 @@ else
   # Install K3s worker
   K3S_URL=$K3S_URL K3S_TOKEN=$K3S_TOKEN INSTALL_K3S_SKIP_DOWNLOAD=true /etc/pf9/k3s-setup/k3s-install.sh
   check_command "Installing K3s worker"
+
+  # wait until ctr becomes responsive
+  wait_for_k3s_worker
+  check_command "Waiting for k3s worker to come up"
+  
+  # Load images
+  log "Loading all the images in /etc/pf9/images..."
+  for img in /etc/pf9/images/*.tar; do
+    sudo ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images import "$img"
+    check_command "Loading image: $img"
+  done
 
   log "K3s worker setup completed."
   sleep 20 

@@ -24,8 +24,6 @@ import (
 // including resource allocation, network configuration, storage details, and host placement.
 // This comprehensive data is necessary for accurately recreating the VM in the target environment.
 type VMInfo struct {
-	// MacAddresses is the list of MAC addresses assigned to the VM's network interfaces
-	MacAddresses []string `json:"macAddresses,omitempty"`
 	// Name is the name of the virtual machine
 	Name string `json:"name"`
 	// Datastores is the list of datastores for the virtual machine
@@ -52,12 +50,33 @@ type VMInfo struct {
 	AssignedIP string `json:"assignedIp,omitempty"`
 	// RDMDisks is the list of RDM disks for the virtual machine
 	RDMDisks []string `json:"rdmDisks,omitempty"`
+	// NetworkInterfaces is the list of network interfaces for the virtual machine expect the lo device
+	NetworkInterfaces []NIC `json:"networkInterfaces,omitempty"`
+	// GuestNetworks is the list of network interfaces for the virtual machine as reported by the guest
+	GuestNetworks []GuestNetwork `json:"guestNetworks,omitempty"`
+}
+
+// NIC represents a Virtual ethernet card in the virtual machine.
+type NIC struct {
+	Network string `json:"network,omitempty" `
+	MAC     string `json:"mac,omitempty"`
+	Index   int    `json:"order,omitempty"`
+}
+
+// GuestNetwork represents a network interface as reported by the guest.
+type GuestNetwork struct {
+	MAC          string   `json:"mac,omitempty"`
+	IP           string   `json:"ip,omitempty"`
+	Origin       string   `json:"origin,omitempty"`       // DHCP or static
+	PrefixLength int32    `json:"prefixLength,omitempty"` // Subnet mask length
+	DNS          []string `json:"dns,omitempty"`          // DNS servers
+	Device       string   `json:"device,omitempty"`       // e.g. eth0
 }
 
 // VMwareMachineSpec defines the desired state of VMwareMachine
 type VMwareMachineSpec struct {
 	// VMInfo is the info of the VMs in the VMwareMachine
-	VMInfo VMInfo `json:"vms,omitempty"` // VM details including MAC addresses
+	VMInfo VMInfo `json:"vms,omitempty"`
 
 	// TargetFlavorId is the flavor to be used to create the target VM on openstack
 	TargetFlavorID string `json:"targetFlavorId,omitempty"`

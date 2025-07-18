@@ -53,12 +53,13 @@ import { useErrorHandler } from "src/hooks/useErrorHandler"
 const stringsCompareFn = (a, b) =>
   a.toLowerCase().localeCompare(b.toLowerCase())
 
-const StyledDrawer = styled(Drawer)(() => ({
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
   "& .MuiDrawer-paper": {
     display: "grid",
     gridTemplateRows: "max-content 1fr max-content",
     width: "1400px",
     maxWidth: "90vw", // For responsiveness on smaller screens
+    zIndex: theme.zIndex.modal,
   },
 }))
 
@@ -693,7 +694,10 @@ export default function MigrationFormDrawer({
       anchor="right"
       open={open}
       onClose={handleClose}
-      ModalProps={{ keepMounted: false }}
+      ModalProps={{ 
+        keepMounted: false,
+        style: { zIndex: 1300 }
+      }}
     >
       <Header title="Migration Form" icon={<MigrationIcon />} />
       <DrawerContent>

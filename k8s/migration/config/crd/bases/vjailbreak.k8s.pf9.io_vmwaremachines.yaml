@@ -75,21 +75,54 @@ spec:
                   esxiName:
                     description: ESXiName is the name of the ESXi host
                     type: string
+                  guestNetworks:
+                    description: GuestNetworks is the list of network interfaces for
+                      the virtual machine as reported by the guest
+                    items:
+                      description: GuestNetwork represents a network interface as
+                        reported by the guest.
+                      properties:
+                        device:
+                          type: string
+                        dns:
+                          items:
+                            type: string
+                          type: array
+                        ip:
+                          type: string
+                        mac:
+                          type: string
+                        origin:
+                          type: string
+                        prefixLength:
+                          format: int32
+                          type: integer
+                      type: object
+                    type: array
                   ipAddress:
                     description: IPAddress is the IP address of the virtual machine
                     type: string
-                  macAddresses:
-                    description: MacAddresses is the list of MAC addresses assigned
-                      to the VM's network interfaces
-                    items:
-                      type: string
-                    type: array
                   memory:
                     description: Memory is the amount of memory in the virtual machine
                     type: integer
                   name:
                     description: Name is the name of the virtual machine
                     type: string
+                  networkInterfaces:
+                    description: NetworkInterfaces is the list of network interfaces
+                      for the virtual machine expect the lo device
+                    items:
+                      description: NIC represents a Virtual ethernet card in the virtual
+                        machine.
+                      properties:
+                        mac:
+                          type: string
+                        network:
+                          type: string
+                        order:
+                          type: integer
+                      type: object
+                    type: array
                   networks:
                     description: Networks is the list of networks for the virtual
                       machine

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 11.2.0
+  name: grafana-folders
+  namespace: monitoring
+data:
+  folders.yaml: |-
+    apiVersion: 1
+    
+    folders:
+      - name: K8s Dashboards
+        uid: k8s-dashboards
+        title: K8s Dashboards
+        
+      - name: Migration Dashboards
+        uid: migration-dashboards
+        title: Migration Dashboards

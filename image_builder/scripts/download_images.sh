@@ -26,6 +26,7 @@ v2v_helper="quay.io/platform9/vjailbreak-v2v-helper:$TAG"
 controller="quay.io/platform9/vjailbreak-controller:$TAG"
 ui="quay.io/platform9/vjailbreak-ui:$TAG"
 vpwned="quay.io/platform9/vjailbreak-vpwned:$TAG"
+virtiowin="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
 # TODO(suhas): Create a seperate repository for alpine image in quay
 alpine="quay.io/platform9/vjailbreak:alpine"
 
@@ -67,3 +68,7 @@ ctr images export "image_builder/images/kube-rbac-proxy.tar" quay.io/brancz/kube
 
 echo "[✔] All images downloaded and exported as tar files."
 
+
+# Download virtio-win.iso
+echo "[*] Downloading virtio-win.iso"
+wget -O image_builder/images/virtio-win.iso "$virtiowin"

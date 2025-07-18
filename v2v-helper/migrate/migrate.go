@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -482,6 +483,7 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 			"oracle linux",
 			"fedora",
 			"sles",
+			"sled",
 			"opensuse",
 			"alt linux",
 			"debian",
@@ -551,13 +553,52 @@ func (migobj *Migrate) ConvertVolumes(ctx context.Context, vminfo vm.VMInfo) err
 	//TODO(omkar): can disable DHCP here
 	if strings.ToLower(vminfo.OSType) == constants.OSFamilyLinux {
 		if strings.Contains(osRelease, "ubuntu") {
-			// Add Wildcard Netplan
-			utils.PrintLog("Adding wildcard netplan")
-			err := virtv2v.AddWildcardNetplan(vminfo.VMDisks, useSingleDisk, vminfo.VMDisks[bootVolumeIndex].Path)
-			if err != nil {
-				return fmt.Errorf("failed to add wildcard netplan: %s", err)
+			// Check if netplan is supported
+			versionID := parseVersionID(osRelease)
+			utils.PrintLog(fmt.Sprintf("Version ID: %s", versionID))
+			if versionID == "" {
+				return fmt.Errorf("failed to get version ID")
 			}
-			utils.PrintLog("Wildcard netplan added successfully")
+			if isNetplanSupported(versionID) {
+				// Add Wildcard Netplan
+				utils.PrintLog("Adding wildcard netplan")
+				err := virtv2v.AddWildcardNetplan(vminfo.VMDisks, useSingleDisk, vminfo.VMDisks[bootVolumeIndex].Path)
+				if err != nil {
+					return fmt.Errorf("failed to add wildcard netplan: %s", err)
+				}
+				utils.PrintLog("Wildcard netplan added successfully")
+			} else {
+				utils.PrintLog("Ubuntu version does not support netplan, going to use udev rules")
+				// Since netplan is not supported need to get the ip,mac and network interface mapping
+				// To inject udev rules so that after migration the network interfaces names are consistent
+				// and they get the correct ip address.
+				// Get the network interface mapping from /etc/network/interfaces
+
+				interfaces, err := virtv2v.GetNetworkInterfaceNames(vminfo.VMDisks[bootVolumeIndex].Path)
+				if err != nil {
+					return fmt.Errorf("failed to get network interface names: %s", err)
+				}
+				if len(interfaces) == 0 {
+					log.Printf("Failed to get network interface names, cannot add udev rules, network might not come up post migration, please check the network configuration post migration")
+				} else {
+					utils.PrintLog("Adding udev rules")
+					utils.PrintLog(fmt.Sprintf("Interfaces: %v", interfaces))
+					macs := []string{}
+
+					// By default the network interfaces macs are in the same order as the interfaces
+					for _, nic := range vminfo.NetworkInterfaces {
+						macs = append(macs, nic.MAC)
+					}
+					utils.PrintLog(fmt.Sprintf("MACs: %v", macs))
+					err = virtv2v.AddUdevRules(vminfo.VMDisks, useSingleDisk, vminfo.VMDisks[bootVolumeIndex].Path, interfaces, macs)
+					if err != nil {
+						log.Printf(`Warning Failed to add udev rules: %s, incase of interface name mismatch,
+					 network might not come up post migration, please check the network configuration post migration`, err)
+						log.Println("Continuing with migration")
+						err = nil
+					}
+				}
+			}
 		}
 	}
 	err = migobj.DetachAllVolumes(vminfo)
@@ -674,6 +715,45 @@ func (migobj *Migrate) CreateTargetInstance(vminfo vm.VMInfo) error {
 	}
 
 	return nil
+}
+func parseVersionID(osRelease string) string {
+	for _, line := range strings.Split(osRelease, "\n") {
+		kv := strings.SplitN(line, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(strings.ToUpper(kv[0]))
+		val := strings.Trim(kv[1], `"`) // Remove any quotes
+
+		if key == "VERSION_ID" {
+			return val
+		}
+	}
+	return ""
+}
+
+func isNetplanSupported(version string) bool {
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		log.Printf("Warning: unexpected VERSION_ID format: %q", version)
+		return true // assume modern if uncertain
+	}
+
+	major, err1 := strconv.Atoi(parts[0])
+	minor, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		log.Printf("Warning: failed to parse VERSION_ID %q: %v %v", version, err1, err2)
+		return true
+	}
+
+	// Compare with 17.10
+	if major > 17 {
+		return true
+	}
+	if major == 17 && minor >= 10 {
+		return true
+	}
+	return false
 }
 
 func (migobj *Migrate) pingVM(ips []string) error {

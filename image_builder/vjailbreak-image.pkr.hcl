@@ -69,13 +69,13 @@ build {
   }
 
   provisioner "file" {
-    source      = "${path.root}/scripts/download_images.sh"
-    destination = "/tmp/download_images.sh"
+    source      = "${path.root}/images"
+    destination = "/home/ubuntu"
   }
 
   provisioner "file" {
-    source      = "${path.root}/images"
-    destination = "/home/ubuntu"
+    source      = "${path.root}/opensource.txt"
+    destination = "/tmp/opensource.txt"
   }
 
   provisioner "shell" {
@@ -83,12 +83,15 @@ build {
     "sudo mv /tmp/install.sh /etc/pf9/install.sh",
     "sudo mv /tmp/k3s.env /etc/pf9/k3s.env",
     "sudo mkdir -p image_builder/images",
-    "sudo mv /tmp/download_images.sh /etc/pf9/download_images.sh",
     "sudo mv /home/ubuntu/images/* /etc/pf9/images",
+    "sudo mkdir -p /home/ubuntu/virtio-win",
+    "sudo chown -R ubuntu:ubuntu /home/ubuntu/virtio-win",
+    "sudo mv /etc/pf9/images/virtio-win.iso /home/ubuntu/virtio-win/virtio-win.iso",
     "sudo mv /tmp/yamls /etc/pf9/yamls",
     "sudo mv /tmp/rsyncd.conf /etc/pf9/rsyncd.conf",
     "sudo mv /tmp/daemonset.yaml /etc/pf9/yamls/daemonset.yaml",
     "sudo mv /tmp/env /etc/pf9/env",
+    "sudo mv /tmp/opensource.txt /home/ubuntu/opensource.txt",
     "sudo chmod +x /etc/pf9/install.sh",
     "sudo chown root:root /etc/pf9/k3s.env",
     "sudo chmod 644 /etc/pf9/k3s.env",

@@ -96,12 +96,13 @@ const CdsIconWrapper = styled('div')({
     justifyContent: 'center'
 });
 
-const StyledDrawer = styled(Drawer)(() => ({
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
     "& .MuiDrawer-paper": {
         display: "grid",
         gridTemplateRows: "max-content 1fr max-content",
         width: "1400px",
         maxWidth: "90vw",
+        zIndex: theme.zIndex.modal,
     },
     "& .hidden-column": {
         display: "none"
@@ -1899,7 +1900,10 @@ export default function RollingMigrationFormDrawer({
                 anchor="right"
                 open={open}
                 onClose={handleClose}
-                ModalProps={{ keepMounted: false }}
+                ModalProps={{ 
+                    keepMounted: false,
+                    style: { zIndex: 1300 }
+                }}
             >
                 <Header title="Cluster Conversion" icon={<ClusterIcon />} />
 
