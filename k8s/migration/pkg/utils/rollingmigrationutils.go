@@ -548,7 +548,7 @@ func IsRollingMigrationPlanPaused(ctx context.Context, name string, client clien
 	if rollingMigrationPlan.Labels == nil {
 		return false
 	}
-	return rollingMigrationPlan.Labels[constants.PauseMigrationLabel] == constants.TrueString
+	return rollingMigrationPlan.Labels[constants.PauseMigrationLabel] == trueString
 }
 
 // IsClusterMigrationPaused checks if a cluster migration is currently paused
@@ -560,7 +560,7 @@ func IsClusterMigrationPaused(ctx context.Context, name string, client client.Cl
 	if clusterMigration.Labels == nil {
 		return false
 	}
-	return clusterMigration.Labels[constants.PauseMigrationLabel] == constants.TrueString
+	return clusterMigration.Labels[constants.PauseMigrationLabel] == trueString
 }
 
 // IsESXIMigrationPaused checks if an ESXi migration is currently paused
@@ -572,7 +572,7 @@ func IsESXIMigrationPaused(ctx context.Context, name string, client client.Clien
 	if esxiMigration.Labels == nil {
 		return false
 	}
-	return esxiMigration.Labels[constants.PauseMigrationLabel] == constants.TrueString
+	return esxiMigration.Labels[constants.PauseMigrationLabel] == trueString
 }
 
 // IsMigrationPlanPaused checks if a migration plan is currently paused
@@ -584,7 +584,7 @@ func IsMigrationPlanPaused(ctx context.Context, name string, client client.Clien
 	if migrationPlan.Labels == nil {
 		return false
 	}
-	return migrationPlan.Labels[constants.PauseMigrationLabel] == constants.TrueString
+	return migrationPlan.Labels[constants.PauseMigrationLabel] == trueString
 }
 
 // PauseRollingMigrationPlan pauses all migration operations for a rolling migration plan
@@ -596,7 +596,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 	}
 
 	// Set label on rolling migration plan
-	rollingMigrationPlan.Labels[constants.PauseMigrationLabel] = constants.TrueString
+	rollingMigrationPlan.Labels[constants.PauseMigrationLabel] = trueString
 
 	// Update all child ClusterMigrations
 	for _, cluster := range rollingMigrationPlan.Spec.ClusterSequence {
@@ -611,7 +611,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 		if clusterMigration.Labels == nil {
 			clusterMigration.Labels = make(map[string]string)
 		}
-		clusterMigration.Labels[constants.PauseMigrationLabel] = constants.TrueString
+		clusterMigration.Labels[constants.PauseMigrationLabel] = trueString
 		err = scope.Client.Update(ctx, clusterMigration)
 		if err != nil {
 			log.Error(err, "failed to update cluster migration with pause label", "cluster", cluster.ClusterName)
@@ -637,7 +637,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 			if esxiMigration.Labels == nil {
 				esxiMigration.Labels = make(map[string]string)
 			}
-			esxiMigration.Labels[constants.PauseMigrationLabel] = constants.TrueString
+			esxiMigration.Labels[constants.PauseMigrationLabel] = trueString
 			err = scope.Client.Update(ctx, esxiMigration)
 			if err != nil {
 				log.Error(err, "failed to update ESXi migration with pause label", "esxi", esxi)
@@ -658,7 +658,7 @@ func PauseRollingMigrationPlan(ctx context.Context, scope *scope.RollingMigratio
 		if migrationPlan.Labels == nil {
 			migrationPlan.Labels = make(map[string]string)
 		}
-		migrationPlan.Labels[constants.PauseMigrationLabel] = constants.TrueString
+		migrationPlan.Labels[constants.PauseMigrationLabel] = trueString
 		err = scope.Client.Update(ctx, migrationPlan)
 		if err != nil {
 			log.Error(err, "failed to update migration plan with pause label", "plan", planName)

@@ -1,0 +1,56 @@
+Open Source Credits
+-------------------
+vJailbreak makes use of the following open-source components in whole or in part. 
+You can find the source code of these open source projects along with license information below. 
+We acknowledge and are grateful to these developers for their contributions to the open source community.
+
+*
+
+virt-v2v
+https://github.com/libguestfs/virt-v2v
+Tool for converting virtual machines from foreign hypervisors (like VMware) to run on KVM.  
+Copyright (C) Red Hat
+License: GPLv2+
+
+*
+
+nbdkit
+https://github.com/libguestfs/nbdkit
+Flexible plugin-based NBD server for exporting block devices over the network.
+Copyright (C) Red Hat
+License: BSD
+
+*
+
+k3s
+https://github.com/k3s-io/k3s
+Lightweight Kubernetes distribution designed for edge computing and resource-constrained environments.
+Copyright (C) Rancher Labs, Inc.
+License: Apache License 2.0
+
+*
+
+OpenStack
+https://www.openstack.org
+Open source cloud computing platform for public and private clouds.
+Includes components such as Nova, Glance, Cinder, Neutron, Keystone, and others.
+Copyright (C) OpenStack Foundation and contributors
+License: Apache License 2.0
+
+*
+
+govmomi
+https://github.com/vmware/govmomi
+Go library for interacting with VMware vSphere APIs, including ESXi and vCenter.
+Copyright (C) VMware, Inc.
+License: Apache License 2.0
+
+*
+
+virtio-win (Windows Paravirtual Drivers)
+https://github.com/virtio-win/kvm-guest-drivers-windows
+https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/
+Paravirtualized device drivers for Windows guests running on KVM/QEMU hypervisors.
+Contains drivers for disk, network, balloon, serial, etc.
+Copyright © 2009–2017 Red Hat, Inc., 2016 Google Inc., 2016 Virtuozzo, Inc., 2007 IBM Corporation
+License: Mixed — BSD-3-Clause, GPLv2, and LGPLv2+

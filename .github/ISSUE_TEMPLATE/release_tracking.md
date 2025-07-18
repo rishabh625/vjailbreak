@@ -19,6 +19,7 @@ assignees: ''
 * [ ] [Release Lead] [Prepare main branch for the new release]
 * [ ] [Release Lead] [Update documentation and website]
 * [ ] [Release Lead] [Notify stakeholders about the release]
+* [ ] [Release Lead] [Check All images are available in registry]
 * [ ] [Release Lead] [Close the issue]
 * [ ] [Stakeholders] [Confirm release date]
 * [ ] [Stakeholders] [Notify all relevant parties about the release]

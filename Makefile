@@ -17,6 +17,7 @@ endif
 
 VERSION = $(RELEASE_VER)-$(GIT_SHA)
 
+export REGISTRY ?= quay.io
 export REPO ?= platform9
 export TAG ?= $(VERSION)
 export UI_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-ui:${TAG}
@@ -26,7 +27,6 @@ export VPWNED_IMG ?= ${REGISTRY}/${REPO}/vjailbreak-vpwned:${TAG}
 export RELEASE_VERSION ?= $(VERSION)
 export KUBECONFIG ?= ~/.kube/config
 export CONTAINER_TOOL ?= docker
-export REGISTRY ?= quay.io
 
 
 .PHONY: ui

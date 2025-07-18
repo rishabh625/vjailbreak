@@ -179,6 +179,7 @@ vJailbreak builds upon several open-source technologies:
 - [k3s](https://k3s.io/)
 - [OpenStack](https://www.openstack.org/)
 - [govmomi](https://github.com/vmware/govmomi)
+- [virtio-win](https://github.com/virtio-win/kvm-guest-drivers-windows)
 
 ## Contributing
 
