@@ -67,13 +67,6 @@ func GetMigrationConfigMapName() (string, error) {
 	}
 	return fmt.Sprintf("migration-config-%s", vmK8sName), nil
 }
-func GetVMwareMachineName() (string, error) {
-	vmK8sName := os.Getenv("VMWARE_MACHINE_OBJECT_NAME")
-	if vmK8sName == "" {
-		return "", errors.New("VMWARE_MACHINE_OBJECT_NAME environment variable is not set")
-	}
-	return vmK8sName, nil
-}
 
 func WriteToLogFile(message string) error {
 	// Get migration object name from environment variable
@@ -102,4 +95,12 @@ func WriteToLogFile(message string) error {
 		return errors.Wrap(err, "failed to write log message to log file")
 	}
 	return nil
+}
+
+func GetVMwareMachineName() (string, error) {
+	vmK8sName := os.Getenv("VMWARE_MACHINE_OBJECT_NAME")
+	if vmK8sName == "" {
+		return "", errors.New("VMWARE_MACHINE_OBJECT_NAME environment variable is not set")
+	}
+	return vmK8sName, nil
 }

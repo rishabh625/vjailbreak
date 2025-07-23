@@ -19,6 +19,7 @@ resources:
 - bases/vjailbreak.k8s.pf9.io_bmconfigs.yaml
 - bases/vjailbreak.k8s.pf9.io_pcdclusters.yaml
 - bases/vjailbreak.k8s.pf9.io_pcdhosts.yaml
+- bases/vjailbreak.k8s.pf9.io_rdmdisks.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
