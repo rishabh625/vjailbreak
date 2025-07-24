@@ -16,6 +16,7 @@ import (
 
 	gophercloud "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/schedulerstats"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumetypes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -245,7 +246,6 @@ func VerifyStorage(ctx context.Context, k3sclient client.Client, openstackcreds 
 	if err != nil {
 		return errors.Wrap(err, "failed to extract all volume types")
 	}
-
 	// Verify that all volume types in targetstorage exist in the openstack volume types
 	for _, targetstorage := range targetstorages {
 		found := false
@@ -293,14 +293,18 @@ func GetOpenstackInfo(ctx context.Context, k3sclient client.Client, openstackcre
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to extract all networks")
 	}
-
+	volumeBackendPools, err := getCinderVolumeBackendPools(openstackClients)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get cinder volume backend pools")
+	}
 	for i := 0; i < len(allNetworks); i++ {
 		openstacknetworks = append(openstacknetworks, allNetworks[i].Name)
 	}
 
 	return &vjailbreakv1alpha1.OpenstackInfo{
-		VolumeTypes: openstackvoltypes,
-		Networks:    openstacknetworks,
+		VolumeTypes:    openstackvoltypes,
+		Networks:       openstacknetworks,
+		VolumeBackends: volumeBackendPools,
 	}, nil
 }
 
@@ -1243,6 +1247,23 @@ func getClusterNameFromHost(ctx context.Context, c *vim25.Client, host mo.HostSy
 		fmt.Printf("unknown parent type for host %s: %s\n", host.Name, parentType)
 		return ""
 	}
+}
+
+// getCinderVolumeBackendPools retrieves the list of Cinder volume backend pools from OpenStack
+func getCinderVolumeBackendPools(openstackClients *OpenStackClients) ([]string, error) {
+	allStoragePoolPages, err := schedulerstats.List(openstackClients.BlockStorageClient, nil).AllPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list all storage backend pools")
+	}
+	pools, err := schedulerstats.ExtractStoragePools(allStoragePoolPages)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract all storage backend pools")
+	}
+	volBackendPools := make([]string, 0, len(pools))
+	for _, pool := range pools {
+		volBackendPools = append(volBackendPools, pool.Name)
+	}
+	return volBackendPools, nil
 }
 
 func appendToVMErrorsThreadSafe(errMu *sync.Mutex, vmErrors *[]vmError, vmName string, err error) {

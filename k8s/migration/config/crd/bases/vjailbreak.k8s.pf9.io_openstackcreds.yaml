@@ -182,6 +182,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  volumeBackends:
+                    items:
+                      type: string
+                    type: array
                   volumeTypes:
                     items:
                       type: string
