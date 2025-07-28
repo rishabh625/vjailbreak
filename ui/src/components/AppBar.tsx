@@ -6,12 +6,14 @@ import Menu from "@mui/material/Menu"
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
 import MigrationIcon from "@mui/icons-material/SwapHoriz"
 import ClusterIcon from "@mui/icons-material/Hub"
+import ExcelIcon from '@mui/icons-material/UploadFile';
 import { useState } from "react"
 import ThemeToggle from "./ThemeToggle"
+import ExcelMigrationModal from "./ExcelMigrationModal"
 
 export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -22,7 +24,11 @@ export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
   };
 
   const handleMigrationSelect = (type: string) => {
-    setOpenMigrationForm(true, type);
+    if (type === "excelmigration") {
+      setExcelModalOpen(true);
+    } else {
+      setOpenMigrationForm(true, type);
+    }
     handleMenuClose();
   };
 
@@ -67,7 +73,14 @@ export default function ButtonAppBar({ setOpenMigrationForm, hide = false }) {
             <span>Start Cluster Conversion</span>
           </Box>
         </MenuItem>
+        <MenuItem onClick={() => handleMigrationSelect('excelmigration')}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ExcelIcon fontSize="small" />
+            <span>Start Migration From Excel</span>
+          </Box>
+        </MenuItem>
       </Menu>
+      <ExcelMigrationModal open={excelModalOpen} onClose={() => setExcelModalOpen(false)} />
     </Box>
   )
 }
