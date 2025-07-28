@@ -680,7 +680,18 @@ func ExtractGuestNetworkInfo(vmProps *mo.VirtualMachine) ([]vjailbreakv1alpha1.G
 // processVMDisk processes a single virtual disk device and updates the disk information
 // it returns the datastore reference, RDM disk info, a skip flag, and any error encountered
 // It checks if the disk is backed by a shared SCSI controller and skips the VM.
-func processVMDisk(disk *types.VirtualDisk, hostStorageInfo *types.HostStorageDeviceInfo) (dsref *types.ManagedObjectReference, rdmDiskInfos vjailbreakv1alpha1.RDMDiskInfo, err error) {
+func processVMDisk(ctx context.Context,
+	disk *types.VirtualDisk,
+	controllers map[int32]types.BaseVirtualSCSIController,
+	hostStorageInfo *types.HostStorageDeviceInfo,
+	vmName string) (dsref *types.ManagedObjectReference, rdmDiskInfos vjailbreakv1alpha1.RDMDiskInfo, skipVM bool, err error) {
+	if controller, ok := controllers[disk.ControllerKey]; ok {
+		if controller.GetVirtualSCSIController().SharedBus == types.VirtualSCSISharingPhysicalSharing {
+			ctrllog.FromContext(ctx).Info("SKipping VM: VM has SCSI controller with shared bus, migration not supported",
+				"vm", vmName)
+			return nil, vjailbreakv1alpha1.RDMDiskInfo{}, true, nil
+		}
+	}
 	switch backing := disk.Backing.(type) {
 	case *types.VirtualDiskFlatVer2BackingInfo:
 		ref := backing.Datastore.Reference()
@@ -705,10 +716,10 @@ func processVMDisk(disk *types.VirtualDisk, hostStorageInfo *types.HostStorageDe
 			}
 		}
 	default:
-		return nil, vjailbreakv1alpha1.RDMDiskInfo{}, fmt.Errorf("unsupported disk backing type: %T", disk.Backing)
+		return nil, vjailbreakv1alpha1.RDMDiskInfo{}, false, fmt.Errorf("unsupported disk backing type: %T", disk.Backing)
 	}
 
-	return dsref, rdmDiskInfos, nil
+	return dsref, rdmDiskInfos, false, nil
 }
 
 // AppendUnique appends unique values to a slice
@@ -1349,7 +1360,7 @@ func processSingleVM(ctx context.Context, scope *scope.VMwareCredsScope, vm *obj
 		if !ok {
 			continue
 		}
-		dsref, rdmInfos, skip, err := processVMDisk(ctx, disk, controllers, hostStorageInfo, vm.Name())
+		dsref, rdmInfos, skip, err := processVMDisk(ctx, disk, hostStorageInfo)
 		if err != nil {
 			appendToVMErrorsThreadSafe(errMu, vmErrors, vm.Name(), fmt.Errorf("failed to process VM disk: %w", err))
 			return
