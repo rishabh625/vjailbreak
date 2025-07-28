@@ -81,4 +81,36 @@ var _ = Describe("RDMDisk Controller", func() {
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
 	})
+
+	Context("When validating RDMDisk fields", func() {
+		It("should return an error if required fields are missing", func() {
+			rdmDisk := &vjailbreakv1alpha1.RDMDisk{
+				Spec: vjailbreakv1alpha1.RDMDiskSpec{
+					OpenstackVolumeRef: vjailbreakv1alpha1.VolumeRefInfo{},
+				},
+			}
+
+			err := ValidateRDMDiskFields(rdmDisk)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("OpenstackVolumeRef.source is required"))
+		})
+
+		It("should pass validation if all required fields are present", func() {
+			rdmDisk := &vjailbreakv1alpha1.RDMDisk{
+				Spec: vjailbreakv1alpha1.RDMDiskSpec{
+					OpenstackVolumeRef: vjailbreakv1alpha1.VolumeRefInfo{
+						Source: map[string]string{
+							"sourceKey": "sourceValue",
+						},
+						CinderBackendPool: "valid-pool",
+						VolumeType:        "valid-type",
+					},
+					DiskName: "valid-disk",
+				},
+			}
+
+			err := ValidateRDMDiskFields(rdmDisk)
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 })

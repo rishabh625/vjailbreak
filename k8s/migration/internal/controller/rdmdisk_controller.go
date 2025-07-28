@@ -43,6 +43,9 @@ type RDMDiskReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// Define a constant for the validation retry interval
+const validationRetryInterval = 2 * time.Minute
+
 // +kubebuilder:rbac:groups=vjailbreak.k8s.pf9.io,resources=rdmdisks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vjailbreak.k8s.pf9.io,resources=rdmdisks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vjailbreak.k8s.pf9.io,resources=rdmdisks/finalizers,verbs=update
@@ -64,7 +67,7 @@ func (r *RDMDiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	rdmDisk := &vjailbreakv1alpha1.RDMDisk{}
 	if err := r.Get(ctx, req.NamespacedName, rdmDisk); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "unable to fetch RDMDisk")
+			ctxlog.Error(err, "unable to fetch RDMDisk")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -82,7 +85,7 @@ func (r *RDMDiskReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return r.handleManagingPhase(ctx, req, rdmDisk, ctxlog)
 
 	default:
-		log.Info("Unknown phase", "phase", rdmDisk.Status.Phase)
+		ctxlog.Info("Unknown phase", "phase", rdmDisk.Status.Phase)
 		return ctrl.Result{}, nil
 	}
 }
@@ -93,17 +96,16 @@ func (r *RDMDiskReconciler) handleInitialPhase(ctx context.Context, rdmDisk *vja
 	if mostRecentValidationFailedCondition != nil {
 		lastTransitionTime := mostRecentValidationFailedCondition.LastTransitionTime.Time
 		timeSinceLastTransition := time.Since(lastTransitionTime)
-		if timeSinceLastTransition < 2*time.Minute {
+		if timeSinceLastTransition < validationRetryInterval {
 			log.Info("Skipping validation as a ValidationFailed condition was set less than 2 minutes ago",
-				"RDMDisk", rdmDisk.Name,
 				"LastReason", mostRecentValidationFailedCondition.Reason)
-			requeueAfter := 2*time.Minute - timeSinceLastTransition
+			requeueAfter := validationRetryInterval - timeSinceLastTransition
 			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
 	}
 	if err := ValidateRDMDiskFields(rdmDisk); err != nil {
 		log.Error(err, "validation failed")
-		meta.SetStatusCondition(&rdmDisk.Status.Conditions, metav1.Condition{
+		updateStatusCondition(rdmDisk, metav1.Condition{
 			Type:    constants.ConditionValidationFailed,
 			Status:  metav1.ConditionTrue,
 			Reason:  constants.ReasonRequiredFieldsMissing,
@@ -116,7 +118,7 @@ func (r *RDMDiskReconciler) handleInitialPhase(ctx context.Context, rdmDisk *vja
 		return ctrl.Result{}, nil
 	}
 	rdmDisk.Status.Phase = "Pending"
-	meta.SetStatusCondition(&rdmDisk.Status.Conditions, metav1.Condition{
+	updateStatusCondition(rdmDisk, metav1.Condition{
 		Type:    constants.ConditionValidationPassed,
 		Status:  metav1.ConditionTrue,
 		Reason:  constants.ReasonValidatedSpecs,
@@ -133,7 +135,7 @@ func (r *RDMDiskReconciler) handleInitialPhase(ctx context.Context, rdmDisk *vja
 func (r *RDMDiskReconciler) handlePendingPhase(ctx context.Context, rdmDisk *vjailbreakv1alpha1.RDMDisk, log logr.Logger) (ctrl.Result, error) {
 	if rdmDisk.Spec.ImportToCinder {
 		rdmDisk.Status.Phase = "Managing"
-		meta.SetStatusCondition(&rdmDisk.Status.Conditions, metav1.Condition{
+		updateStatusCondition(rdmDisk, metav1.Condition{
 			Type:    "MigrationStarted",
 			Status:  metav1.ConditionTrue,
 			Reason:  "ImportToCinderEnabled",
@@ -182,11 +184,11 @@ func (r *RDMDiskReconciler) handleManagingPhase(ctx context.Context, req ctrl.Re
 		}
 		volumeID, err := utils.ImportLUNToCinder(ctx, &osclient, rdmDiskObj)
 		if err != nil {
-			return ctrl.Result{}, handleError(ctx, r.Client, rdmDisk, "Error", constants.MigrationFailed, "Failed to manage RDM disk in Cinder", err)
+			return ctrl.Result{}, handleError(ctx, r.Client, rdmDisk, "Error", constants.MigrationFailed, "Failed to import LUN to Cinder", err)
 		}
 		rdmDisk.Status.Phase = "Managed"
 		rdmDisk.Status.CinderVolumeID = volumeID
-		meta.SetStatusCondition(&rdmDisk.Status.Conditions, metav1.Condition{
+		updateStatusCondition(rdmDisk, metav1.Condition{
 			Type:    constants.MigrationSucceeded,
 			Status:  metav1.ConditionTrue,
 			Reason:  "CinderManageSucceeded",
@@ -258,4 +260,9 @@ func getMostRecentValidationFailedCondition(conditions []metav1.Condition) *meta
 		}
 	}
 	return mostRecent
+}
+
+// Refactor status condition updates into a helper function
+func updateStatusCondition(rdmDisk *vjailbreakv1alpha1.RDMDisk, condition metav1.Condition) {
+	meta.SetStatusCondition(&rdmDisk.Status.Conditions, condition)
 }
