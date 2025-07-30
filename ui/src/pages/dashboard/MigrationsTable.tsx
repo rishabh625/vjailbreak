@@ -2,8 +2,10 @@ import { DataGrid, GridColDef, GridRowSelectionModel, GridToolbarContainer } fro
 import { Button, Typography, Box, IconButton, Tooltip } from "@mui/material";
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import MigrationIcon from '@mui/icons-material/SwapHoriz';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import { useState } from "react";
 import CustomSearchToolbar from "src/components/grid/CustomSearchToolbar";
+import LogsDrawer from "src/components/LogsDrawer";
 import { Condition, Migration, Phase } from "src/api/migrations/model";
 import MigrationProgress from "./MigrationProgress";
 import { QueryObserverResult } from "@tanstack/react-query";
@@ -102,26 +104,8 @@ const columns: GridColDef[] = [
         field: "actions",
         headerName: "Actions",
         flex: 1,
-        renderCell: (params) => {
-
-            return (
-                <Tooltip title={"Delete migration"} >
-                    <IconButton
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            params.row.onDelete(params.row.metadata?.name);
-                        }}
-                        size="small"
-                        sx={{
-                            cursor: 'pointer',
-                            position: 'relative'
-                        }}
-                    >
-                        <DeleteIcon />
-                    </IconButton>
-                </Tooltip>
-            );
-        },
+        // placeholder, will be overridden in component with logs button
+        renderCell: () => null,
     },
 ]
 
@@ -183,6 +167,8 @@ export default function MigrationsTable({
     refetchMigrations
 }: MigrationsTableProps) {
     const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel>([]);
+    const [logsDrawerOpen, setLogsDrawerOpen] = useState(false);
+    const [selectedPod, setSelectedPod] = useState<{ name: string; namespace: string } | null>(null);
 
     const handleSelectionChange = (newSelection: GridRowSelectionModel) => {
         setSelectedRows(newSelection);
@@ -193,39 +179,101 @@ export default function MigrationsTable({
         onDelete: onDeleteMigration
     })) || [];
 
+    // Enhance columns to include logs and delete buttons
+    const enhancedColumns: GridColDef[] = columns.map(column => {
+        if (column.field !== "actions") {
+            return column;
+        }
+        return {
+            ...column,
+            renderCell: (params) => (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {params.row.spec?.podRef && (
+                        <Tooltip title="View pod logs">
+                            <IconButton
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedPod({
+                                        name: params.row.spec.podRef,
+                                        namespace: params.row.metadata?.namespace || ''
+                                    });
+                                    setLogsDrawerOpen(true);
+                                }}
+                                size="small"
+                                sx={{
+                                    cursor: 'pointer',
+                                    position: 'relative'
+                                }}
+                            >
+                                <ListAltIcon />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                    <Tooltip title="Delete migration">
+                        <IconButton
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                params.row.onDelete(params.row.metadata?.name);
+                            }}
+                            size="small"
+                            sx={{
+                                cursor: 'pointer',
+                                position: 'relative'
+                            }}
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            )
+        }
+    });
+
+    const effectiveColumns = onDeleteSelected === undefined && onDeleteMigration === undefined
+        ? enhancedColumns.filter(column => column.field !== "actions")
+        : enhancedColumns;
+
     return (
-        <DataGrid
-            rows={migrationsWithActions}
-            columns={onDeleteSelected === undefined && onDeleteMigration === undefined ? columns.filter(column => column.field !== "actions") : columns}
-            initialState={{
-                pagination: { paginationModel: { page: 0, pageSize: 25 } },
-                sorting: {
-                    sortModel: [{ field: 'status', sort: 'asc' }],
-                },
-            }}
-            pageSizeOptions={[25, 50, 100]}
-            localeText={{ noRowsLabel: "No Migrations Available" }}
-            getRowId={(row) => row.metadata?.name}
-            checkboxSelection={onDeleteSelected !== undefined && onDeleteMigration !== undefined}
-            onRowSelectionModelChange={handleSelectionChange}
-            rowSelectionModel={selectedRows}
-            disableRowSelectionOnClick
-            slots={{
-                toolbar: onDeleteSelected !== undefined && onDeleteMigration !== undefined ? () => (
-                    <CustomToolbar
-                        numSelected={selectedRows.length}
-                        onDeleteSelected={() => {
-                            const selectedMigrations = migrations?.filter(
-                                m => selectedRows.includes(m.metadata?.name)
-                            );
-                            if (onDeleteSelected) {
-                                onDeleteSelected(selectedMigrations || []);
-                            }
-                        }}
-                        refetchMigrations={refetchMigrations}
-                    />
-                ) : undefined,
-            }}
-        />
+        <>
+            <DataGrid
+                rows={migrationsWithActions}
+                columns={effectiveColumns}
+                initialState={{
+                    pagination: { paginationModel: { page: 0, pageSize: 25 } },
+                    sorting: {
+                        sortModel: [{ field: 'status', sort: 'asc' }],
+                    },
+                }}
+                pageSizeOptions={[25, 50, 100]}
+                localeText={{ noRowsLabel: "No Migrations Available" }}
+                getRowId={(row) => row.metadata?.name}
+                checkboxSelection={onDeleteSelected !== undefined && onDeleteMigration !== undefined}
+                onRowSelectionModelChange={handleSelectionChange}
+                rowSelectionModel={selectedRows}
+                disableRowSelectionOnClick
+                slots={{
+                    toolbar: onDeleteSelected !== undefined && onDeleteMigration !== undefined ? () => (
+                        <CustomToolbar
+                            numSelected={selectedRows.length}
+                            onDeleteSelected={() => {
+                                const selectedMigrations = migrations?.filter(
+                                    m => selectedRows.includes(m.metadata?.name)
+                                );
+                                if (onDeleteSelected) {
+                                    onDeleteSelected(selectedMigrations || []);
+                                }
+                            }}
+                            refetchMigrations={refetchMigrations}
+                        />
+                    ) : undefined,
+                }}
+            />
+            <LogsDrawer
+                open={logsDrawerOpen}
+                onClose={() => setLogsDrawerOpen(false)}
+                podName={selectedPod?.name || ''}
+                namespace={selectedPod?.namespace || ''}
+            />
+        </>
     );
-} 
+}

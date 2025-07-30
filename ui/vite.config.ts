@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
         "/dev-api": {
           target: `${env.VITE_API_HOST}`,
           changeOrigin: true,
+          secure: false,
           headers: {
             Authorization: `Bearer ${env.VITE_API_TOKEN}`,
           },
