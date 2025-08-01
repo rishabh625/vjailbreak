@@ -13,7 +13,6 @@ import (
 
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
 	"github.com/platform9/vjailbreak/v2v-helper/vm"
 
 	"github.com/gophercloud/gophercloud"
@@ -28,14 +27,14 @@ import (
 //go:generate mockgen -source=../openstack/openstackops.go -destination=../openstack/openstackops_mock.go -package=openstack
 
 type OpenstackOperations interface {
-	CreateVolume(name string, size int64, ostype string, uefi bool, volumetype string) (*volumes.Volume, error)
+	CreateVolume(name string, size int64, ostype string, uefi bool, volumetype string, setRDMLabel bool) (*volumes.Volume, error)
 	WaitForVolume(volumeID string) error
 	AttachVolumeToVM(volumeID string) error
 	WaitForVolumeAttachment(volumeID string) error
 	DetachVolumeFromVM(volumeID string) error
 	SetVolumeUEFI(volume *volumes.Volume) error
 	EnableQGA(volume *volumes.Volume) error
-	SetVolumeImageMetadata(volume *volumes.Volume) error
+	SetVolumeImageMetadata(volume *volumes.Volume, setRDMLabel bool) error
 	SetVolumeBootable(volume *volumes.Volume) error
 	GetClosestFlavour(cpu int32, memory int32) (*flavors.Flavor, error)
 	GetFlavor(flavorId string) (*flavors.Flavor, error)
@@ -47,7 +46,6 @@ type OpenstackOperations interface {
 	DeleteVolume(volumeID string) error
 	FindDevice(volumeID string) (string, error)
 	WaitUntilVMActive(vmID string) (bool, error)
-	CinderManage(rdmDisk vm.RDMDisk, openstackAPIVersion string) (*volumes.Volume, error)
 }
 
 func getCert(endpoint string) (*x509.Certificate, error) {
@@ -68,7 +66,7 @@ func getCert(endpoint string) (*x509.Certificate, error) {
 	return cert, nil
 }
 
-func validateOpenStack(insecure bool) (*migrateutils.OpenStackClients, error) {
+func validateOpenStack(insecure bool) (*utils.OpenStackClients, error) {
 	opts, err := openstack.AuthOptionsFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OpenStack auth options: %s", err)
@@ -134,14 +132,14 @@ func validateOpenStack(insecure bool) (*migrateutils.OpenStackClients, error) {
 		return nil, fmt.Errorf("failed to create networking client: %s", err)
 	}
 
-	return &migrateutils.OpenStackClients{
+	return &utils.OpenStackClients{
 		BlockStorageClient: blockStorageClient,
 		ComputeClient:      computeClient,
 		NetworkingClient:   networkingClient,
 	}, nil
 }
 
-func NewOpenStackClients(insecure bool) (*migrateutils.OpenStackClients, error) {
+func NewOpenStackClients(insecure bool) (*utils.OpenStackClients, error) {
 	ostackclients, err := validateOpenStack(insecure)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate OpenStack connection: %s", err)

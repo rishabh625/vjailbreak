@@ -545,6 +545,10 @@ spec:
                   MigrationStatus is the status of the migration using Kubernetes PodPhase states
                   (Pending, Running, Succeeded, Failed, Unknown)
                 type: string
+              retryCount:
+                description: Migration RetryCount is the number of times the migration
+                  has been retried
+                type: integer
             required:
             - migrationMessage
             - migrationStatus
@@ -1323,7 +1327,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RDMDisk is the Schema for the rdmdisks API.
+        description: RDMDisk is the Schema for the RDMDisks API.
         properties:
           apiVersion:
             description: |-
@@ -1346,9 +1350,8 @@ spec:
             description: Spec defines the desired state of RDMDisk
             properties:
               diskName:
-                description: |-
-                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
+                description: 'Important: Run "make" to regenerate code after modifying
+                  this file'
                 type: string
               diskSize:
                 type: integer
@@ -1357,7 +1360,7 @@ spec:
               importToCinder:
                 type: boolean
               openstackVolumeRef:
-                description: OpenstackVolumeRefInfo contains information about the
+                description: OpenstackVolumeRef ... contains information about the
                   OpenStack volume reference.
                 properties:
                   cinderBackendPool:
@@ -2381,42 +2384,7 @@ spec:
                     description: RDMDisks is the list of RDM disks for the virtual
                       machine
                     items:
-                      description: RDMDiskInfo contains information about a Raw Device
-                        Mapping (RDM) disk
-                      properties:
-                        diskName:
-                          description: DiskName is the name of the disk
-                          type: string
-                        diskSize:
-                          description: DiskSize is the size of the disk in GB
-                          format: int64
-                          type: integer
-                        displayName:
-                          description: DisplayName is the display name of the disk
-                          type: string
-                        openstackVolumeRef:
-                          description: OpenstackVolumeRef contains OpenStack volume
-                            reference information
-                          properties:
-                            cinderBackendPool:
-                              description: CinderBackendPool is the cinder backend
-                                pool of the disk
-                              type: string
-                            volumeRef:
-                              additionalProperties:
-                                type: string
-                              description: VolumeRef is the reference to the OpenStack
-                                volume
-                              type: object
-                            volumeType:
-                              description: VolumeType is the volume type of the disk
-                              type: string
-                          type: object
-                        uuid:
-                          description: UUID (VML id) is the unique identifier of the
-                            disk
-                          type: string
-                      type: object
+                      type: string
                     type: array
                   vmState:
                     description: VMState is the state of the virtual machine

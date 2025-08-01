@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"reflect"
@@ -33,6 +34,7 @@ import (
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/constants"
 	"github.com/platform9/vjailbreak/k8s/migration/pkg/scope"
 	utils "github.com/platform9/vjailbreak/k8s/migration/pkg/utils"
+	"github.com/platform9/vjailbreak/k8s/migration/pkg/verrors"
 	"github.com/platform9/vjailbreak/v2v-helper/vcenter"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -52,6 +54,7 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/session"
+	govmomitypes "github.com/vmware/govmomi/vim25/types"
 )
 
 // VDDKDirectory is the path to VMware VDDK installation directory used for VM disk conversion
@@ -378,8 +381,30 @@ func (r *MigrationPlanReconciler) ReconcileMigrationPlanJob(ctx context.Context,
 	}
 
 	for _, parallelvms := range migrationplan.Spec.VirtualMachines {
+		err := r.migrateRDMdisks(ctx, migrationplan)
+		if err != nil {
+			if err == verrors.ErrRDMDiskNotMigrated {
+				retries := migrationplan.Status.RetryCount
+				if retries <= 5 {
+					delay := 5 * time.Duration(math.Pow(2, float64(retries))) * time.Second
+					r.ctxlog.Info("RDM disk not migrated yet, requeuing MigrationPlan.", "retryCount", retries, "requeueAfter", delay)
+					migrationplan.Status.RetryCount++
+					if err := r.Update(ctx, migrationplan); err != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to update MigrationPlan retry count: %w", err)
+					}
+					return ctrl.Result{RequeueAfter: delay}, nil
+				}
+			}
+			r.ctxlog.Info("RDM disk not migrated, failing MigrationPlan.", "error", err.Error())
+			migrationplan.Status.MigrationStatus = corev1.PodFailed
+			migrationplan.Status.MigrationMessage = "RDM disk not migrated after maximum retries."
+			if err := r.Update(ctx, migrationplan); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update MigrationPlan status: %w", err)
+			}
+			return ctrl.Result{}, err
+		}
 		migrationobjs := &vjailbreakv1alpha1.MigrationList{}
-		err := r.TriggerMigration(ctx, migrationplan, migrationobjs, openstackcreds, vmwcreds, migrationtemplate, parallelvms)
+		err = r.TriggerMigration(ctx, migrationplan, migrationobjs, openstackcreds, vmwcreds, migrationtemplate, parallelvms)
 		if err != nil {
 			if strings.Contains(err.Error(), "VDDK_MISSING") {
 				r.ctxlog.Info("Requeuing due to missing VDDK files.")
@@ -1042,6 +1067,7 @@ func (r *MigrationPlanReconciler) TriggerMigration(ctx context.Context,
 				break
 			}
 		}
+
 		if vmMachineObj == nil {
 			return errors.Wrapf(err, "VM '%s' not found in VMwareMachine", vm)
 		}
@@ -1214,4 +1240,83 @@ func EnsureVMFolderExists(ctx context.Context, finder *find.Finder, dc *object.D
 		return nil, errors.Wrapf(err, "failed to create folder '%s'", folderName)
 	}
 	return folder, nil
+}
+
+func (r *MigrationPlanReconciler) migrateRDMdisks(ctx context.Context, migrationplan *vjailbreakv1alpha1.MigrationPlan) error {
+	allRDMDisks := []*vjailbreakv1alpha1.RDMDisk{}
+	parallelVMsMap := make(map[string]bool)
+	rdmDiskCRToBeUpdated := make([]vjailbreakv1alpha1.RDMDisk, 0)
+	// create a map of all parallel VMs for quick lookup
+	// This is used to validate that all ownerVMs in RDM disks are present in the migration plan
+	// and to ensure that RDM disks are only processed once per VM.
+	for _, parallelVMs := range migrationplan.Spec.VirtualMachines {
+		for _, vmName := range parallelVMs {
+			parallelVMsMap[vmName] = true
+		}
+	}
+	for _, parallelVMs := range migrationplan.Spec.VirtualMachines {
+		for _, vmName := range parallelVMs {
+			vmMachine := &vjailbreakv1alpha1.VMwareMachine{}
+			if err := r.Get(ctx, types.NamespacedName{Name: vmName, Namespace: migrationplan.Namespace}, vmMachine); err != nil {
+				return fmt.Errorf("failed to get VMwareMachine %s: %w", vmName, err)
+			}
+			// Check if VM is powered off
+			if vmMachine.Status.PowerState == string(govmomitypes.VirtualMachinePowerStatePoweredOff) {
+				return fmt.Errorf("VM %s is not powered off, cannot migrate RDM disks", vmName)
+			}
+			if len(vmMachine.Spec.VMInfo.RDMDisks) > 0 {
+				for _, rdmDisk := range vmMachine.Spec.VMInfo.RDMDisks {
+					// Get RDMDisk CR
+					rdmDiskCR := &vjailbreakv1alpha1.RDMDisk{}
+					err := r.Get(ctx, types.NamespacedName{
+						Name:      strings.TrimSpace(rdmDisk),
+						Namespace: migrationplan.Namespace,
+					}, rdmDiskCR)
+
+					if err != nil {
+						if !apierrors.IsNotFound(err) {
+							return fmt.Errorf("failed to get RDMDisk CR: %w", err)
+						}
+					} else {
+						// Validate that all ownerVMs are present in parallelVMs
+						for _, ownerVM := range rdmDiskCR.Spec.OwnerVMs {
+							if !parallelVMsMap[ownerVM] {
+								return fmt.Errorf("ownerVM %q in RDM disk %s not found in migration plan ", ownerVM, rdmDisk)
+							}
+						}
+						// Update existing RDMDisk CR
+						err := ValidateRDMDiskFields(rdmDiskCR)
+						if err != nil {
+							return fmt.Errorf("failed to validate RDMDisk CR: %w", err)
+						}
+						if !rdmDiskCR.Spec.ImportToCinder {
+							rdmDiskCR.Spec.ImportToCinder = true
+							rdmDiskCRToBeUpdated = append(rdmDiskCRToBeUpdated, *rdmDiskCR)
+						}
+						allRDMDisks = append(allRDMDisks, rdmDiskCR)
+					}
+				}
+			}
+		}
+	}
+
+	for _, rdmDiskCR := range rdmDiskCRToBeUpdated {
+		if err := r.Update(ctx, &rdmDiskCR); err != nil {
+			return fmt.Errorf("failed to update RDMDisk CR: %w", err)
+		}
+	}
+	for _, rdmDiskCR := range allRDMDisks {
+		reFetchedRDMDiskCR := &vjailbreakv1alpha1.RDMDisk{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      strings.TrimSpace(rdmDiskCR.Name),
+			Namespace: migrationplan.Namespace,
+		}, rdmDiskCR)
+		if err != nil {
+			return err
+		}
+		if reFetchedRDMDiskCR.Status.Phase != "Managed" || reFetchedRDMDiskCR.Status.CinderVolumeID == "" {
+			return verrors.ErrRDMDiskNotMigrated
+		}
+	}
+	return nil
 }

@@ -2,11 +2,11 @@ package k8sutils
 
 import (
 	"context"
+	"os"
 
 	"github.com/pkg/errors"
 	vjailbreakv1alpha1 "github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
 	"github.com/platform9/vjailbreak/v2v-helper/pkg/constants"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,7 +40,7 @@ func GetVMwareMachine(ctx context.Context, vmName string) (*vjailbreakv1alpha1.V
 		return nil, err
 	}
 	vmwareMachine := &vjailbreakv1alpha1.VMwareMachine{}
-	vmK8sName, err := utils.GetVMwareMachineName()
+	vmK8sName, err := GetVMwareMachineName()
 	if err != nil {
 		return nil, err
 	}
@@ -52,4 +52,31 @@ func GetVMwareMachine(ctx context.Context, vmName string) (*vjailbreakv1alpha1.V
 		return nil, errors.Wrap(err, "failed to get vmware machine")
 	}
 	return vmwareMachine, nil
+}
+
+func GetVMwareMachineName() (string, error) {
+	vmK8sName := os.Getenv("VMWARE_MACHINE_OBJECT_NAME")
+	if vmK8sName == "" {
+		return "", errors.New("VMWARE_MACHINE_OBJECT_NAME environment variable is not set")
+	}
+	return vmK8sName, nil
+}
+
+func GetRDMDisk(ctx context.Context, diskName string) (*vjailbreakv1alpha1.RDMDisk, error) {
+	client, err := GetInclusterClient()
+	if err != nil {
+		return nil, err
+	}
+	rdmDisk := &vjailbreakv1alpha1.RDMDisk{}
+	if err != nil {
+		return nil, err
+	}
+	err = client.Get(ctx, types.NamespacedName{
+		Name:      diskName,
+		Namespace: constants.NamespaceMigrationSystem,
+	}, rdmDisk)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get vmware machine")
+	}
+	return rdmDisk, nil
 }

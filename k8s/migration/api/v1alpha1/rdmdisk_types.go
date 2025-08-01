@@ -40,7 +40,7 @@ type RDMDiskStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// RDMDisk is the Schema for the rdmdisks API.
+// RDMDisk is the Schema for the RDMDisks API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 type RDMDisk struct {
