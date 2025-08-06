@@ -56,13 +56,13 @@ func TestGetVMInfo(t *testing.T) {
 	// Set required environment variable for the test
 	os.Setenv("VMWARE_MACHINE_OBJECT_NAME", "DC0_H0_VM0")
 	defer os.Unsetenv("VMWARE_MACHINE_OBJECT_NAME")
-	
+
 	// Instead of trying to call GetVMInfo which requires real k8s access,
 	// let's create a simple stub test that passes
 	t.Skip("Skipping TestGetVMInfo as it requires access to Kubernetes API server")
-	
+
 	// The test below is kept for documentation purposes but skipped during execution
-	
+
 	simVC, model, server, err := simulateVCenter()
 	defer cleanupSimulator(model, server)
 	assert.Nil(t, err)

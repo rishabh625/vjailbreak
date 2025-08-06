@@ -20,18 +20,19 @@ import (
 // RDMDiskSpec defines the desired state of RDMDisk.
 type RDMDiskSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
-	DiskName           string             `json:"diskName"`
-	DiskSize           int                `json:"diskSize"`
-	UUID               string             `json:"uuid"`
-	DisplayName        string             `json:"displayName"`
-	OwnerVMs           []string           `json:"ownerVMs"`
-	OpenstackVolumeRef OpenstackVolumeRef `json:"openstackVolumeRef"`       // OpenStack volume reference information
-	ImportToCinder     bool               `json:"importToCinder,omitempty"` // Indicates whether the RDM disk should be imported to Cinder and is set by MigrationPlan Controller
+	DiskName    string   `json:"diskName"`
+	DiskSize    int      `json:"diskSize"`
+	UUID        string   `json:"uuid"`
+	DisplayName string   `json:"displayName"`
+	OwnerVMs    []string `json:"ownerVMs"`
+	// +optional
+	OpenstackVolumeRef OpenstackVolumeRef `json:"openstackVolumeRef,omitempty"` // OpenStack volume reference information
+	ImportToCinder     bool               `json:"importToCinder,omitempty"`     // Indicates whether the RDM disk should be imported to Cinder and is set by MigrationPlan Controller
 }
 
 // RDMDiskStatus defines the observed state of RDMDisk.
 type RDMDiskStatus struct {
-	// +kubebuilder:validation:Enum=Pending;Managing;Managed;Error
+	// +kubebuilder:validation:Enum=Available;Managing;Managed;Error
 	Phase          string             `json:"phase,omitempty"` //  Available | Managing | Managed | Error
 	CinderVolumeID string             `json:"cinderVolumeID,omitempty"`
 	Conditions     []metav1.Condition `json:"conditions,omitempty"`
@@ -40,7 +41,7 @@ type RDMDiskStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// RDMDisk is the Schema for the rdmdisks API.
+// RDMDisk is the Schema for the RDMDisks API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 type RDMDisk struct {
@@ -62,10 +63,14 @@ type RDMDiskList struct {
 
 // OpenstackVolumeRef ... contains information about the OpenStack volume reference.
 type OpenstackVolumeRef struct {
-	VolumeRef         map[string]string `json:"source"` // volumeRef contains the OpenStack volume reference information - obtained by query - openstack block storage volume manageable list
-	CinderBackendPool string            `json:"cinderBackendPool"`
-	VolumeType        string            `json:"volumeType"`
-	OpenstackCreds    string            `json:"openstackCreds,omitempty"` // Optional: OpenStack credentials to use for the volume
+	// +optional
+	VolumeRef map[string]string `json:"source,omitempty"` // volumeRef contains the OpenStack volume reference information - obtained by query - openstack block storage volume manageable list
+	// +optional
+	CinderBackendPool string `json:"cinderBackendPool,omitempty"`
+	// +optional
+	VolumeType string `json:"volumeType,omitempty"`
+	// +optional
+	OpenstackCreds string `json:"openstackCreds,omitempty"` // Optional: OpenStack credentials to use for the volume
 
 }
 

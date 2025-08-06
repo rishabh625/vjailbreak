@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: vpwned
   newName: quay.io/platform9/vjailbreak-vpwned
-  newTag: v0.3.0
+  newTag: test-branch-2-compare-shared-rdm-controller-changes-7c8d5383

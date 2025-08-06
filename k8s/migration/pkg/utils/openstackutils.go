@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
-	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils/migrateutils"
-	"github.com/platform9/vjailbreak/v2v-helper/vm"
+	"github.com/platform9/vjailbreak/k8s/migration/api/v1alpha1"
+	"github.com/platform9/vjailbreak/v2v-helper/pkg/utils"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -31,16 +32,16 @@ type Volume struct {
 }
 
 // ImportLUNToCinder imports a LUN into OpenStack Cinder and returns the volume ID.
-func ImportLUNToCinder(ctx context.Context, openstackClient *migrateutils.OpenStackClients, rdmDisk vm.RDMDisk, volumeAPIVersion string) (string, error) {
+func ImportLUNToCinder(ctx context.Context, openstackClient *utils.OpenStackClients, rdmDisk v1alpha1.RDMDisk, volumeAPIVersion string) (string, error) {
 	ctxlog := logf.FromContext(ctx)
-	ctxlog.Info("Importing LUN", "DiskName", rdmDisk.DiskName)
+	ctxlog.Info("Importing LUN", "RDM CR", rdmDisk.Name, "DiskName", rdmDisk.Spec.DiskName)
 
 	volume, err := ExecuteVolumeManageRequest(ctx, rdmDisk, openstackClient, volumeAPIVersion)
 	if err != nil {
-		return "", fmt.Errorf("failed to import LUN %s: %w", rdmDisk.DiskName, err)
+		return "", fmt.Errorf("failed to import LUN %s: %w", rdmDisk.Name, err)
 	}
 	if volume == nil || volume.ID == "" {
-		return "", fmt.Errorf("failed to import LUN %s: received empty volume ID", rdmDisk.DiskName)
+		return "", fmt.Errorf("failed to import LUN %s: received empty volume ID", rdmDisk.Name)
 	}
 
 	ctxlog.Info("LUN imported successfully, waiting for volume to become available", "VolumeID", volume.ID)
@@ -56,36 +57,36 @@ func ImportLUNToCinder(ctx context.Context, openstackClient *migrateutils.OpenSt
 }
 
 // BuildVolumeManagePayload builds the request payload for manage volume.
-func BuildVolumeManagePayload(rdmDisk vm.RDMDisk) (map[string]interface{}, error) {
+func BuildVolumeManagePayload(rdmDisk v1alpha1.RDMDisk) (map[string]interface{}, error) {
 	// Validate required fields
-	if rdmDisk.DiskName == "" {
+	if rdmDisk.Spec.DiskName == "" {
 		return nil, fmt.Errorf("disk name cannot be empty")
 	}
-	if rdmDisk.CinderBackendPool == "" {
+	if rdmDisk.Spec.OpenstackVolumeRef.CinderBackendPool == "" {
 		return nil, fmt.Errorf("cinder backend pool cannot be empty")
 	}
-	if rdmDisk.VolumeType == "" {
+	if rdmDisk.Spec.OpenstackVolumeRef.VolumeType == "" {
 		return nil, fmt.Errorf("volume type cannot be empty")
 	}
-	if len(rdmDisk.VolumeRef) == 0 {
+	if len(rdmDisk.Spec.OpenstackVolumeRef.VolumeRef) == 0 {
 		return nil, fmt.Errorf("volume reference cannot be empty")
 	}
 
 	// Assumes only one key-value pair in VolumeRef
 	var key, value string
-	for k, rm := range rdmDisk.VolumeRef {
-		key = k
-		value = rm
+	for k, rm := range rdmDisk.Spec.OpenstackVolumeRef.VolumeRef {
+		key = strings.Trim(k, "'\"")
+		value = strings.Trim(rm, "'\"")
 		break
 	}
 
 	volumePayload := VolumePayload{
 		Volume: Volume{
-			Host:             rdmDisk.CinderBackendPool,
+			Host:             rdmDisk.Spec.OpenstackVolumeRef.CinderBackendPool,
 			Ref:              map[string]string{key: value},
-			Name:             rdmDisk.DiskName,
-			VolumeType:       rdmDisk.VolumeType,
-			Description:      "Volume for " + rdmDisk.DiskName,
+			Name:             rdmDisk.Spec.DiskName,
+			VolumeType:       rdmDisk.Spec.OpenstackVolumeRef.VolumeType,
+			Description:      "Volume for " + rdmDisk.Spec.DiskName,
 			Bootable:         false,
 			AvailabilityZone: nil,
 		},
@@ -103,7 +104,7 @@ func BuildVolumeManagePayload(rdmDisk vm.RDMDisk) (map[string]interface{}, error
 }
 
 // ExecuteVolumeManageRequest triggers the volume manage request and returns volume.
-func ExecuteVolumeManageRequest(ctx context.Context, rdmDisk vm.RDMDisk, osclient *migrateutils.OpenStackClients, openstackAPIVersion string) (*volumes.Volume, error) {
+func ExecuteVolumeManageRequest(ctx context.Context, rdmDisk v1alpha1.RDMDisk, osclient *utils.OpenStackClients, openstackAPIVersion string) (*volumes.Volume, error) {
 	body, err := BuildVolumeManagePayload(rdmDisk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build volume manage payload: %w", err)

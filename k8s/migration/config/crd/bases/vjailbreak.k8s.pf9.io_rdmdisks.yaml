@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RDMDisk is the Schema for the rdmdisks API.
+        description: RDMDisk is the Schema for the RDMDisks API.
         properties:
           apiVersion:
             description: |-
@@ -50,7 +50,7 @@ spec:
               importToCinder:
                 type: boolean
               openstackVolumeRef:
-                description: OpenstackVolumeRefInfo contains information about the
+                description: OpenstackVolumeRef ... contains information about the
                   OpenStack volume reference.
                 properties:
                   cinderBackendPool:
@@ -63,10 +63,6 @@ spec:
                     type: object
                   volumeType:
                     type: string
-                required:
-                - cinderBackendPool
-                - source
-                - volumeType
                 type: object
               ownerVMs:
                 items:
@@ -78,7 +74,6 @@ spec:
             - diskName
             - diskSize
             - displayName
-            - openstackVolumeRef
             - ownerVMs
             - uuid
             type: object
@@ -145,7 +140,7 @@ spec:
                 type: array
               phase:
                 enum:
-                - Pending
+                - Available
                 - Managing
                 - Managed
                 - Error

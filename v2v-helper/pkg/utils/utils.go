@@ -71,6 +71,7 @@ func GetMigrationConfigMapName() (string, error) {
 	}
 	return fmt.Sprintf("migration-config-%s", vmK8sName), nil
 }
+
 func GetVMwareMachineName() (string, error) {
 	vmK8sName := os.Getenv("VMWARE_MACHINE_OBJECT_NAME")
 	if vmK8sName == "" {
