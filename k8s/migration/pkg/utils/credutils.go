@@ -605,7 +605,10 @@ func GetAllVMs(ctx context.Context, scope *scope.VMwareCredsScope, datacenter st
 
 	// Create a semaphore to limit concurrent goroutines
 	semaphore := make(chan struct{}, vjailbreakSettings.VCenterScanConcurrencyLimit)
-
+	start := time.Now()
+	vmData := fetchVMInfoBatch(ctx, scope, vms, c)
+	fmt.Println("Fetched vm data", vmData)
+	fmt.Println("Time taken to fetch vm data:", time.Since(start))
 	for i := range vms {
 		// Acquire semaphore (blocks if 100 goroutines are already running)
 		semaphore <- struct{}{}
@@ -846,7 +849,6 @@ func CreateOrUpdateVMwareMachine(ctx context.Context, client client.Client,
 		vmwvm.Labels[constants.VMwareCredsLabel] = vmwcreds.Name
 
 		if !reflect.DeepEqual(vmwvm.Spec.VMInfo, *vminfo) || !reflect.DeepEqual(vmwvm.Labels[constants.ESXiNameLabel], esxiK8sName) || !reflect.DeepEqual(vmwvm.Labels[constants.VMwareClusterLabel], clusterK8sName) {
-			syncRDMDisks(vminfo, vmwvm)
 			// update vminfo in case the VM has been moved by vMotion
 			assignedIP := ""
 			osType := ""
@@ -1526,4 +1528,158 @@ func processSingleVM(ctx context.Context, scope *scope.VMwareCredsScope, vm *obj
 	if err != nil {
 		appendToVMErrorsThreadSafe(errMu, vmErrors, vm.Name(), fmt.Errorf("failed to create or update VMwareMachine: %w", err))
 	}
+}
+
+func fetchVMInfoBatch(ctx context.Context, scope *scope.VMwareCredsScope, vms []*object.VirtualMachine, client *vim25.Client) []vjailbreakv1alpha1.VMInfo {
+	const batchSize = 50
+	log := scope.Logger
+	collector := property.DefaultCollector(client)
+	var vmInfos []vjailbreakv1alpha1.VMInfo
+
+	for i := 0; i < len(vms); i += batchSize {
+		end := i + batchSize
+		if end > len(vms) {
+			end = len(vms)
+		}
+		batch := vms[i:end]
+
+		var objectSet []types.ObjectSpec
+		for _, vm := range batch {
+			objectSet = append(objectSet, types.ObjectSpec{
+				Obj:  vm.Reference(),
+				Skip: types.NewBool(false),
+			})
+		}
+
+		filterSpec := types.PropertyFilterSpec{
+			ObjectSet: objectSet,
+			PropSet: []types.PropertySpec{
+				{
+					Type:    "VirtualMachine",
+					PathSet: []string{"config.hardware.device", "config.name", "guest.ipAddress", "guest.guestState", "guest.guestFamily", "config.hardware.numCPU", "config.hardware.memoryMB", "datastore", "network", "runtime.host"},
+				},
+			},
+		}
+
+		//	options := types.RetrieveOptions{MaxObjects: int32(batchSize)}
+		req := types.RetrieveProperties{
+			SpecSet: []types.PropertyFilterSpec{filterSpec},
+		}
+		res, err := collector.RetrieveProperties(ctx, req, batchSize)
+		if err != nil {
+			log.Error(err, "failed to retrieve VM properties")
+			continue
+		}
+
+		var batchInfos []vjailbreakv1alpha1.VMInfo
+		var vms []mo.VirtualMachine
+		err = mo.LoadObjectContent(res.Returnval, &vms)
+		if err != nil {
+			log.Error(err, "failed to decode ObjectContent into mo.VirtualMachine")
+			continue
+		}
+		for _, moVM := range vms {
+			if moVM.Config == nil || strings.HasPrefix(moVM.Config.Name, "vCLS-") {
+				continue
+			}
+
+			var dsNames, netNames, diskLabels []string
+			var rdmDisks []vjailbreakv1alpha1.RDMDiskInfo
+			controllers := make(map[int32]types.BaseVirtualSCSIController)
+
+			for _, device := range moVM.Config.Hardware.Device {
+				if scsiCtrl, ok := device.(types.BaseVirtualSCSIController); ok {
+					controllers[device.GetVirtualDevice().Key] = scsiCtrl
+				}
+			}
+
+			for _, device := range moVM.Config.Hardware.Device {
+				disk, ok := device.(*types.VirtualDisk)
+				if !ok {
+					continue
+				}
+				if ctrl, ok := controllers[disk.ControllerKey]; ok && ctrl.GetVirtualSCSIController().SharedBus == types.VirtualSCSISharingPhysicalSharing {
+					log.Info("Skipping VM with shared SCSI controller", "VM", moVM.Config.Name)
+					continue
+				}
+
+				switch b := disk.Backing.(type) {
+				case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+					rdmDisks = append(rdmDisks, vjailbreakv1alpha1.RDMDiskInfo{
+						DiskName:    disk.DeviceInfo.GetDescription().Label,
+						DiskSize:    disk.CapacityInBytes,
+						UUID:        b.LunUuid,
+						DisplayName: "",
+					})
+				case *types.VirtualDiskFlatVer2BackingInfo, *types.VirtualDiskSparseVer2BackingInfo:
+					diskLabels = append(diskLabels, disk.DeviceInfo.GetDescription().Label)
+				}
+			}
+
+			if len(moVM.Datastore) > 0 {
+				var moDS []mo.Datastore
+				err := collector.Retrieve(ctx, moVM.Datastore, []string{"name"}, &moDS)
+				if err == nil {
+					for _, ds := range moDS {
+						dsNames = append(dsNames, ds.Name)
+					}
+				}
+			}
+
+			if len(moVM.Network) > 0 {
+				var moNets []mo.Network
+				err := collector.Retrieve(ctx, moVM.Network, []string{"name"}, &moNets)
+				if err == nil {
+					for _, net := range moNets {
+						netNames = append(netNames, net.Name)
+					}
+				}
+			}
+			nic, err := ExtractVirtualNICs(&moVM)
+			if err != nil {
+				log.Error(err, "failed to extract virtual NICs for VM", "VM NAME", moVM.Config.Name)
+				continue
+			}
+			guestNetwork, err := ExtractGuestNetworkInfo(&moVM)
+			if err != nil {
+				log.Error(err, "failed to extract guest network info for VM", "VM NAME", moVM.Config.Name)
+				continue
+			}
+			var clusterName string
+			if moVM.Runtime.Host != nil {
+				var host mo.HostSystem
+				err := collector.Retrieve(ctx, []types.ManagedObjectReference{*moVM.Runtime.Host}, []string{"name", "parent"}, &host)
+				if err != nil {
+					log.Error(err, "failed to retrieve host info", "vm", moVM.Config.Name)
+				} else {
+					clusterName = getClusterNameFromHost(ctx, client, host)
+				}
+			}
+			info := vjailbreakv1alpha1.VMInfo{
+				Name:              moVM.Config.Name,
+				Datastores:        dsNames,
+				Disks:             diskLabels,
+				Networks:          netNames,
+				IPAddress:         moVM.Guest.IpAddress,
+				VMState:           moVM.Guest.GuestState,
+				OSFamily:          moVM.Guest.GuestFamily,
+				CPU:               int(moVM.Config.Hardware.NumCPU),
+				Memory:            int(moVM.Config.Hardware.MemoryMB),
+				RDMDisks:          rdmDisks,
+				ESXiName:          moVM.Summary.Runtime.Host.Value,
+				ClusterName:       clusterName,
+				NetworkInterfaces: nic,
+				GuestNetworks:     guestNetwork,
+			}
+			batchInfos = append(batchInfos, info)
+		}
+
+		for _, info := range batchInfos {
+			if err := CreateOrUpdateVMwareMachine(ctx, scope.Client, scope.VMwareCreds, &info); err != nil {
+				log.Error(err, "failed to create or update VMwareMachine", "vm", info.Name)
+			}
+			vmInfos = append(vmInfos, info)
+		}
+	}
+	return vmInfos
 }
