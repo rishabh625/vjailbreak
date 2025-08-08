@@ -606,7 +606,10 @@ func GetAllVMs(ctx context.Context, scope *scope.VMwareCredsScope, datacenter st
 	// Create a semaphore to limit concurrent goroutines
 	semaphore := make(chan struct{}, vjailbreakSettings.VCenterScanConcurrencyLimit)
 	start := time.Now()
-	vmData := fetchVMInfoBatch(ctx, scope, vms, c)
+	vmData, err := fetchVMInfoBatch(ctx, scope, vms, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch vm data: %w", err)
+	}
 	fmt.Println("Fetched vm data", vmData)
 	fmt.Println("Time taken to fetch vm data:", time.Since(start))
 	for i := range vms {
