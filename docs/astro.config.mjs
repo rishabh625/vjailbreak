@@ -53,8 +53,8 @@ export default defineConfig({
 						// Each item here is one entry in the navigation menu.
 						// manually done so to we can keep the order
 						{ label: 'What is vJailbreak', slug: 'introduction/what_is_vjailbreak' },
-						{ label: 'Getting Started', slug: 'introduction/getting_started' },
 						{ label: 'Prerequisites', slug: 'introduction/prerequisites' },
+						{ label: 'Getting Started', slug: 'introduction/getting_started' },
 					],
 				},
 				{
