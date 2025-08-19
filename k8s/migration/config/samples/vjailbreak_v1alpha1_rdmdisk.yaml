@@ -1,0 +1,23 @@
+apiVersion: vjailbreak.k8s.pf9.io/v1alpha1
+kind: RDMDisk
+metadata:
+  labels:
+    app.kubernetes.io/name: migration
+    app.kubernetes.io/managed-by: kustomize
+  name: rdmdisk-sample
+spec:
+  diskName: "rdm-disk-1"
+  diskSize: 100
+  diskType: "rdm"
+  displayName: "datastore-1"
+  uuid: "123e4567-e89b-12d3-a456-426614174000"
+  ownerVMs:
+    - "vm-1"
+    - "vm-2"
+  importToCinder: true
+  openstackVolumeRef:
+    cinderBackendPool: "cinder-backend-pool-1"
+    openstackCreds: "openstackcreds"
+    source:
+      sourrce-name: "source-disk-1"
+    volumeType: "volume-type-1"

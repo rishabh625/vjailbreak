@@ -168,6 +168,12 @@ const (
 	// PCDClusterNameNoCluster is the name of the PCD cluster when there is no cluster
 	PCDClusterNameNoCluster = "NO CLUSTER"
 
+	// RDMDiskControllerName is the name of the RDM disk controller
+	RDMDiskControllerName = "rdmdisk-controller"
+  
+	// VCenterVMScanConcurrencyLimit is the limit for concurrency while scanning vCenter VMs
+	VCenterVMScanConcurrencyLimit = 100
+
 	// VMwareClusterNameStandAloneESX is the name of the VMware cluster when there is no cluster
 	VMwareClusterNameStandAloneESX = "NO CLUSTER"
 

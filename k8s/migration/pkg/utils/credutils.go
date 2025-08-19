@@ -589,7 +589,7 @@ func GetAllVMs(ctx context.Context, scope *scope.VMwareCredsScope, datacenter st
 	if err != nil {
 		return nil, fmt.Errorf("failed to get vjailbreak settings: %w", err)
 	}
-	log.Info("Fetched vcenter scan concurrency limit", "vcenter_scan_concurrency_limit", vjailbreakSettings.VCenterScanConcurrencyLimit)
+	log.Info("Fetched vjailbreak settings for vcenter scan concurrency limit", "vcenter_scan_concurrency_limit", vjailbreakSettings.VCenterScanConcurrencyLimit)
 
 	c, finder, err := getFinderForVMwareCreds(ctx, scope.Client, scope.VMwareCreds, datacenter)
 	if err != nil {
@@ -733,7 +733,6 @@ func processVMDisk(ctx context.Context,
 			return nil, vjailbreakv1alpha1.RDMDiskInfo{}, true, nil
 		}
 	}
-
 	switch backing := disk.Backing.(type) {
 	case *types.VirtualDiskFlatVer2BackingInfo:
 		ref := backing.Datastore.Reference()
@@ -1242,7 +1241,7 @@ func populateRDMDiskInfoFromAttributes(ctx context.Context, baseRDMDisks []vjail
 					}
 					mp := make(map[string]string)
 					mp[splotVolRef[0]] = splotVolRef[1]
-					log.Info("Setting OpenStack Volume Ref for RDM disk:", diskName, "to", mp, rdmInfo)
+					log.Info("Setting OpenStack Volume Ref for RDM disk:", diskName, "to")
 					rdmInfo.OpenstackVolumeRef = vjailbreakv1alpha1.OpenStackVolumeRefInfo{
 						VolumeRef: mp,
 					}

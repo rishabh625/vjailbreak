@@ -8,5 +8,5 @@ data:
   VM_ACTIVE_WAIT_INTERVAL_SECONDS: "20" # interval to wait for vm to become active
   VM_ACTIVE_WAIT_RETRY_LIMIT: "15" # number of retries to wait for vm to become active
   DEFAULT_MIGRATION_METHOD: "hot" # supported value hot/cold, (This setting is not used as of now. To be used by UI)
-  VCENTER_SCAN_CONCURRENCY_LIMIT: "100" # max number of vcenter scan pods
+  VCENTER_SCAN_CONCURRENCY_LIMIT: "10" # max number of vms to scan at the same time
   

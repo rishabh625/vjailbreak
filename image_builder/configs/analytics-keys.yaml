@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: analytics-keys
+  namespace: migration-system
+type: Opaque
+data:
+  amplitude-api-key: ${AMPLITUDE_API_KEY}
+  bugsnag-api-key: ${BUGSNAG_API_KEY}
+  app-version: ${VJB_VERSION_TAG}
+  release-stage: cHJvZHVjdGlvbgo=

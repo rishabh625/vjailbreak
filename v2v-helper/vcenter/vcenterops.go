@@ -9,15 +9,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
-	"time"
+	"strings"
 
-	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/session/cache"
 	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -36,30 +34,32 @@ type VCenterClient struct {
 
 func validateVCenter(ctx context.Context, username, password, host string, disableSSLVerification bool) (*vim25.Client, error) {
 	// add protocol to host if not present
-	if host[:4] != "http" {
+	if !strings.HasPrefix(host, "http") {
 		host = "https://" + host
 	}
-	if host[len(host)-4:] != "/sdk" {
+
+	// add SDK path if not present
+	if len(host) < 4 || !strings.HasSuffix(host, "/sdk") {
+		// Length check ensures we don't crash on short hosts when checking suffix
 		host += "/sdk"
 	}
+
 	u, err := url.Parse(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URL: %v", err)
 	}
-	credentials := url.UserPassword(username, password)
-	u.User = credentials
+	u.User = url.UserPassword(username, password)
 
-	soapClient := soap.NewClient(u, disableSSLVerification)
-	c, err := vim25.NewClient(ctx, soapClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
+	// Create a session with automatic re-authentication
+	s := &cache.Session{
+		URL:      u,
+		Insecure: disableSSLVerification,
+		Reauth:   true, // Enable automatic re-authentication
 	}
-	c.RoundTripper = session.KeepAlive(c.RoundTripper, 1*time.Hour)
-	client := &govmomi.Client{
-		Client:         c,
-		SessionManager: session.NewManager(c),
-	}
-	err = client.SessionManager.Login(ctx, credentials)
+
+	// Create the client
+	c := new(vim25.Client)
+	err = s.Login(ctx, c, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to login: %v", err)
 	}

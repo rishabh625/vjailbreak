@@ -1,3 +1,5 @@
+import { getSecret } from "src/api/secrets/secrets"
+
 export interface AnalyticsConfig {
   amplitude?: {
     apiKey: string
@@ -10,29 +12,14 @@ export interface AnalyticsConfig {
 }
 
 export class ConfigService {
-  private static readonly CONFIGMAP_NAME = "analytics-config"
-  private static readonly CONFIGMAP_NAMESPACE = "default"
+  private static readonly SECRET_NAME = "analytics-keys"
+  private static readonly SECRET_NAMESPACE = "migration-system"
 
   static async fetchAnalyticsConfig(): Promise<AnalyticsConfig | null> {
     try {
-      const response = await fetch(
-        `/api/v1/namespaces/${this.CONFIGMAP_NAMESPACE}/configmaps/${this.CONFIGMAP_NAME}`,
-        {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
-      )
+      const secret = await getSecret(this.SECRET_NAME, this.SECRET_NAMESPACE)
 
-      if (!response.ok) {
-        throw new Error(
-          `ConfigMap fetch failed: ${response.status} ${response.statusText}`
-        )
-      }
-
-      const configMap = await response.json()
-      const data = configMap.data || {}
+      const data = secret.data || {}
 
       const config: AnalyticsConfig = {}
 
@@ -59,7 +46,7 @@ export class ConfigService {
       return config
     } catch (error) {
       console.error(
-        "Failed to fetch analytics configuration from ConfigMap:",
+        "Failed to fetch analytics configuration from Secret:",
         error
       )
       return null

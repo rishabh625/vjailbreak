@@ -1310,6 +1310,164 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
+  name: rdmdisks.vjailbreak.k8s.pf9.io
+spec:
+  group: vjailbreak.k8s.pf9.io
+  names:
+    kind: RDMDisk
+    listKind: RDMDiskList
+    plural: rdmdisks
+    singular: rdmdisk
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RDMDisk is the Schema for the rdmdisks API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of RDMDisk
+            properties:
+              diskName:
+                description: 'Important: Run "make" to regenerate code after modifying
+                  this file'
+                type: string
+              diskSize:
+                type: integer
+              displayName:
+                type: string
+              importToCinder:
+                type: boolean
+              openstackVolumeRef:
+                description: OpenstackVolumeRef ... contains information about the
+                  OpenStack volume reference.
+                properties:
+                  cinderBackendPool:
+                    type: string
+                  openstackCreds:
+                    type: string
+                  source:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  volumeType:
+                    type: string
+                required:
+                - cinderBackendPool
+                - source
+                - volumeType
+                type: object
+              ownerVMs:
+                items:
+                  type: string
+                type: array
+              uuid:
+                type: string
+            required:
+            - diskName
+            - diskSize
+            - displayName
+            - openstackVolumeRef
+            - ownerVMs
+            - uuid
+            type: object
+          status:
+            description: RDMDiskStatus defines the observed state of RDMDisk.
+            properties:
+              cinderVolumeID:
+                type: string
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              phase:
+                enum:
+                - Pending
+                - Managing
+                - Managed
+                - Error
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
   name: rollingmigrationplans.vjailbreak.k8s.pf9.io
 spec:
   group: vjailbreak.k8s.pf9.io
@@ -2554,6 +2712,7 @@ rules:
   - openstackcreds
   - pcdclusters
   - pcdhosts
+  - rdmdisks
   - rollingmigrationplans
   - storagemappings
   - vjailbreaknodes
@@ -2581,6 +2740,7 @@ rules:
   - openstackcreds/finalizers
   - pcdclusters/finalizers
   - pcdhosts/finalizers
+  - rdmdisks/finalizers
   - rollingmigrationplans/finalizers
   - storagemappings/finalizers
   - vjailbreaknodes/finalizers
@@ -2600,6 +2760,7 @@ rules:
   - openstackcreds/status
   - pcdclusters/status
   - pcdhosts/status
+  - rdmdisks/status
   - rollingmigrationplans/status
   - storagemappings/status
   - vjailbreaknodes/status
@@ -2957,6 +3118,77 @@ rules:
   - vjailbreak.k8s.pf9.io
   resources:
   - pcdhosts/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: migration
+  name: migration-rdmdisk-admin-role
+rules:
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks
+  verbs:
+  - '*'
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: migration
+  name: migration-rdmdisk-editor-role
+rules:
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: migration
+  name: migration-rdmdisk-viewer-role
+rules:
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vjailbreak.k8s.pf9.io
+  resources:
+  - rdmdisks/status
   verbs:
   - get
 ---

@@ -26,6 +26,8 @@ env:
   V2V_IMG: ${{ vars.REGISTRY || 'quay.io' }}/${{ vars.REPO || 'platform9' }}/vjailbreak-v2v-helper
   CONTROLLER_IMG: ${{ vars.REGISTRY || 'quay.io' }}/${{ vars.REPO || 'platform9' }}/vjailbreak-controller
   VPWNED_IMG: ${{ vars.REGISTRY || 'quay.io' }}/${{ vars.REPO || 'platform9' }}/vjailbreak-vpwned
+  AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
+  BUGSNAG_API_KEY: ${{ secrets.BUGSNAG_API_KEY }}
 
 
 jobs:
@@ -369,17 +371,29 @@ jobs:
             echo "release_found=false" >> $GITHUB_ENV
           fi
 
-      - name: Substitue image tags in manifests
+      - name: Substitue image tags in ui manifest
         uses: danielr1996/envsubst-action@1.0.0
         with:
           input: ./ui/deploy/ui.yaml
           output: ./image_builder/deploy/01ui.yaml
 
-      - name: Substitue image tags in manifests
+      - name: Substitue image tags in version config
         uses: danielr1996/envsubst-action@1.0.0
         with:
           input: ./image_builder/configs/version-config.yaml
           output: ./image_builder/deploy/version-config.yaml
+
+      - name: Set base64-encoded environment variables
+        run: |
+          echo "AMPLITUDE_API_KEY=$(echo -n ${{ secrets.AMPLITUDE_API_KEY }} | base64 -w 0)" >> $GITHUB_ENV
+          echo "BUGSNAG_API_KEY=$(echo -n ${{ secrets.BUGSNAG_API_KEY }} | base64 -w 0)" >> $GITHUB_ENV
+          echo "VJB_VERSION_TAG=$(echo -n ${{ needs.determine-release.outputs.tag }}| base64 -w 0)" >> $GITHUB_ENV
+
+      - name: Substitute image tags in analytics secret
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ./image_builder/configs/analytics-keys.yaml 
+          output: ./image_builder/deploy/analytics-keys.yaml
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -391,8 +405,7 @@ jobs:
           make -C ./k8s/migration/ build-installer
           cp ./k8s/migration/dist/install.yaml image_builder/deploy/00controller.yaml
           cp -r ./k8s/kube-prometheus image_builder/deploy/
-          cp ./image_builder/configs/vjailbreak-settings.yaml image_builder/deploy/vjailbreak-settings.yaml
-          
+      
       - name: setup-oras
         uses: oras-project/setup-oras@v1.2.1
 
@@ -472,4 +485,3 @@ jobs:
             image_builder/deploy/01ui.yaml
             image_builder/deploy/version-config.yaml
             image_builder/deploy/vjailbreak-settings.yaml
-            
