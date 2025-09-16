@@ -37,10 +37,18 @@ RUN curl -L -o nbdkit.rpm https://github.com/platform9/vjailbreak/raw/refs/heads
     dnf clean all && \
     rm -rf /tmp/rpms
 
+    # Add version lock for all installed packages
+RUN dnf versionlock add '*' && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
 WORKDIR /tmp
 RUN curl -L -o virt-v2v-2.7.13-1.fc42.x86_64.rpm https://github.com/platform9/vjailbreak/raw/refs/heads/main/assets/rpms/virt-v2v-2.7.13-1.fc42.x86_64.rpm
 
-RUN dnf install -y /tmp/virt-v2v-2.7.13-1.fc42.x86_64.rpm && \
+#RUN dnf repoquery --requires --resolve virt-v2v-2.7.13-1.fc42.x86_64.rpm
+
+
+RUN dnf install -y --nobest --skip-broken /tmp/virt-v2v-2.7.13-1.fc42.x86_64.rpm && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
