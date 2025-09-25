@@ -92,6 +92,13 @@ export interface FormValues extends Record<string, unknown> {
     OS_INSECURE?: boolean
   }
   vms?: VmData[]
+  rdmConfigurations?: Array<{
+    uuid: string;
+    diskName: string;
+    cinderBackendPool: string;
+    volumeType: string;
+    source: Record<string, string>;
+  }>
   networkMappings?: { source: string; target: string }[]
   storageMappings?: { source: string; target: string }[]
   // Cluster selection fields
@@ -320,7 +327,6 @@ export default function MigrationFormDrawer({
 
   useInterval(
     async () => {
-      console.log("migrationTemplate", migrationTemplate?.metadata?.name)
       if (shouldPollMigrationTemplate) {
         try {
           fetchMigrationTemplate()
@@ -478,15 +484,11 @@ export default function MigrationFormDrawer({
     };
 
 
-    console.log('Migration Fields:', JSON.stringify(migrationFields, null, 2));
 
     const body = createMigrationPlanJson(migrationFields);
-    console.log('Final Request Body:', JSON.stringify(body, null, 2));
 
     try {
-      console.log('Sending migration plan creation request...');
       const data = await postMigrationPlan(body);
-      console.log('Migration plan created successfully:', data);
 
       // Track successful migration creation
       track(AMPLITUDE_EVENTS.MIGRATION_CREATED, {

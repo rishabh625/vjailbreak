@@ -10,6 +10,7 @@ export interface VMwareVM {
   assignedIp?: string
   osFamily?: string
   networkInterfaces?: VmNetworkInterface[]
+  rdmDisks?: string[]
 }
 
 export interface VmNetworkInterface {

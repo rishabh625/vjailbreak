@@ -19,10 +19,12 @@ export const getVMwareMachines = async (
       }
     : undefined
 
-  return axios.get<VMwareMachineList>({
+  const response = await axios.get<VMwareMachineList>({
     endpoint,
     config,
   })
+
+  return response
 }
 
 /**

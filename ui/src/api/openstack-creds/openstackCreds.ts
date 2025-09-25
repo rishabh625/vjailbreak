@@ -24,6 +24,25 @@ export const getOpenstackCredentials = async (
   const response = await axios.get<OpenstackCreds>({
     endpoint,
   })
+
+  // TODO: REMOVE MOCK DATA - Add mock Cinder backend pools and data copy methods
+  if (response && response.spec) {
+    response.spec.cinderBackendPools = response.spec.cinderBackendPools || [
+      "primera@A600-TDV",
+      "primera@A650-PROD",
+      "ceph@rbd-pool",
+      "netapp@ontap-svm1",
+      "pure@flasharray-x70",
+    ]
+
+    response.spec.dataCopyMethods = response.spec.dataCopyMethods || [
+      "live",
+      "hot",
+      "cold",
+      "warm",
+    ]
+  }
+
   return response
 }
 

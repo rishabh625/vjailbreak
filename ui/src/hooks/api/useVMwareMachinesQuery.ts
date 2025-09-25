@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
-import {
-  getVMwareMachines,
-  mapToVmData,
-} from "src/api/vmware-machines/vmwareMachines"
+import { getVMwareMachines } from "src/api/vmware-machines/vmwareMachines"
 import { VmData } from "src/api/migration-templates/model"
+import {
+  fetchRdmDisksMap,
+  mapToVmDataWithRdm,
+} from "src/api/rdm-disks/rdmDiskUtils"
 
 export const VMWARE_MACHINES_BASE_KEY = "vmwaremachines"
 
@@ -39,8 +40,13 @@ export const useVMwareMachinesQuery = ({
       if (!areCredsValidated) {
         return []
       }
-      const response = await getVMwareMachines(undefined, vmwareCredName)
-      return mapToVmData(response.items)
+      const [vmResponse, rdmDisksMap] = await Promise.all([
+        getVMwareMachines(undefined, vmwareCredName),
+        fetchRdmDisksMap(),
+      ])
+
+      // Use RDM-aware mapping function
+      return mapToVmDataWithRdm(vmResponse.items, rdmDisksMap)
     },
     enabled: queryEnabled,
     refetchOnWindowFocus: false,

@@ -76,6 +76,10 @@ export interface VmData {
   vmWareMachineName?: string
   networkInterfaces?: VmNetworkInterface[]
   osFamily?: string
+  // RDM-related properties
+  rdmDisks?: string[]
+  hasSharedRdm?: boolean
+  rdmDependencies?: string[] // List of other VM names that share RDM disks with this VM
 }
 
 export interface VmNetworkInterface {

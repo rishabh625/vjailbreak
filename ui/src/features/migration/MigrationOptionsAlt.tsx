@@ -434,7 +434,7 @@ export default function MigrationOptionsAlt({
 
               <Fields sx={{ gridGap: "0" }}>
                 <FormControlLabel
-                  label="Fallback to DHCP if IP can't be preserved"
+                  label="Fallback to DHCP"
                   control={
                     <Checkbox
                       checked={params?.fallbackToDHCP || false}
@@ -445,7 +445,7 @@ export default function MigrationOptionsAlt({
                   }
                 />
                 <Typography variant="caption" sx={{ marginLeft: "32px" }}>
-                  Migration will fail if the original IP cannot be reserved.  
+                  Migrated VM will use IP from DHCP if static IP cannot be preserved.  
                 </Typography>
               </Fields>
 
